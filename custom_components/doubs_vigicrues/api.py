@@ -76,13 +76,21 @@ def _parse_station(enregistrement: dict[str, Any]) -> Station:
     )
 
 
-def _parse_observation(enregistrement: dict[str, Any], grandeur: str) -> Observation:
+def _parse_observation(enregistrement: dict[str, Any], grandeur: str) -> Observation | None:
     """Construit une Observation depuis observations_tr.
 
     ``date_obs`` arrive en UTC (suffixe ``Z``) et est conservée en UTC :
-    la conversion vers l'heure locale se fait à l'affichage.
+    la conversion vers l'heure locale se fait à l'affichage. Un
+    enregistrement sans valeur (``resultat_obs`` nul) n'est pas une
+    mesure : ``None`` est retourné.
     """
-    date_obs = datetime.fromisoformat(enregistrement["date_obs"])
+    if enregistrement.get("resultat_obs") is None:
+        return None
+    try:
+        date_obs = datetime.fromisoformat(enregistrement["date_obs"])
+    except (KeyError, ValueError) as erreur:
+        msg = "Horodatage illisible dans la réponse Hub'Eau"
+        raise DoubsVigicruesApiError(msg) from erreur
     if date_obs.tzinfo is None:
         date_obs = date_obs.replace(tzinfo=UTC)
     return Observation(
@@ -124,11 +132,19 @@ class HubeauClient:
             raise DoubsVigicruesApiError(msg) from erreur
 
     async def async_get_station(self, code: str) -> Station:
-        """Métadonnées d'une station ; erreur dédiée si introuvable."""
+        """Métadonnées d'une station ; erreur dédiée si introuvable.
+
+        Le référentiel accepte des motifs de recherche : si la réponse
+        ne désigne pas exactement le code demandé, la saisie est
+        ambiguë plutôt que de prendre la première station trouvée.
+        """
         donnees = await self._async_get_json("referentiel/stations", {"code_station": code, "format": "json"})
         enregistrements = donnees.get("data") or []
         if not enregistrements:
             msg = f"Station {code} introuvable dans le référentiel Hub'Eau"
+            raise DoubsVigicruesStationError(msg)
+        if enregistrements[0].get("code_station") != code:
+            msg = f"Le code {code} correspond à plusieurs stations : indiquez un code exact"
             raise DoubsVigicruesStationError(msg)
         return _parse_station(enregistrements[0])
 
