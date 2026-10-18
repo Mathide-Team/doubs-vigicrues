@@ -1,0 +1,24 @@
+{
+  "count": 1,
+  "first": "https://exemple.invalid/referentiel/stations?code_station=U259999001&format=json&page=1&size=1000",
+  "next": null,
+  "prev": null,
+  "api_version": "2.0.1",
+  "data": [
+    {
+      "code_site": "U2599990",
+      "code_station": "U259999001",
+      "libelle_station": "Le Douby à Exempleville - Moulin de Test",
+      "libelle_commune": "EXEMPLEVILLE",
+      "code_departement": "25",
+      "libelle_departement": "DOUBS",
+      "code_cours_eau": "U2--9999",
+      "libelle_cours_eau": "Le Douby",
+      "altitude_ref_alti_station": 250.0,
+      "longitude_station": 6.1,
+      "latitude_station": 47.2,
+      "en_service": true,
+      "geometry": {"type": "Point", "coordinates": [6.1, 47.2]}
+    }
+  ]
+}

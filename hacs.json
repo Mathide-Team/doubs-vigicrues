@@ -1,0 +1,7 @@
+{
+  "name": "Niveau du Doubs (Vigicrues)",
+  "render_readme": true,
+  "homeassistant": "2026.3.0",
+  "zip_release": true,
+  "filename": "doubs_vigicrues.zip"
+}

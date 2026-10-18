@@ -1,0 +1,25 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "description": "Suivi d'une station hydrométrique Vigicrues (données Hub'Eau, sans clé). Par défaut : le Doubs à Besançon - Moulin Saint-Paul.",
+        "data": {
+          "station": "Code de la station Vigicrues"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Impossible de joindre l'API Hub'Eau.",
+      "station_inconnue": "Station introuvable dans le référentiel : vérifiez le code."
+    },
+    "abort": {
+      "already_configured": "Cette station est déjà configurée."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "hauteur": { "name": "Hauteur" },
+      "debit": { "name": "Débit" }
+    }
+  }
+}

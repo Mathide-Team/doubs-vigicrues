@@ -1,0 +1,9 @@
+{
+  "count": 3,
+  "api_version": "2.0.1",
+  "data": [
+    {"code_station": "U259999001", "date_obs": "2026-10-18T15:00:00Z", "resultat_obs": 1234.0, "code_continuite": 0, "libelle_continuite": "Continue"},
+    {"code_station": "U259999001", "date_obs": "2026-10-18T14:50:00Z", "resultat_obs": 1250.0, "code_continuite": 0, "libelle_continuite": "Continue"},
+    {"code_station": "U259999001", "date_obs": "2026-10-18T14:40:00Z", "resultat_obs": 1240.0, "code_continuite": 0, "libelle_continuite": "Continue"}
+  ]
+}
