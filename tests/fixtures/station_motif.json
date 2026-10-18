@@ -1,0 +1,19 @@
+{
+  "count": 12,
+  "api_version": "2.0.1",
+  "data": [
+    {
+      "code_station": "U259991001",
+      "libelle_station": "Une autre station du motif",
+      "libelle_commune": "AUTREVILLE",
+      "code_departement": "25",
+      "libelle_departement": "DOUBS",
+      "code_cours_eau": "U2--9998",
+      "libelle_cours_eau": "L'Autre Rive",
+      "altitude_ref_alti_station": 300.0,
+      "longitude_station": 6.2,
+      "latitude_station": 47.3,
+      "en_service": true
+    }
+  ]
+}

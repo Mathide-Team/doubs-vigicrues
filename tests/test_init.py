@@ -27,13 +27,21 @@ def _build_app() -> web.Application:
 
     async def referentiel(request: web.Request) -> web.Response:
         code = request.query.get("code_station", "")
-        if code == STATION:
-            return web.json_response(json.loads(_lire("station_referentiel.json")))
-        return web.json_response(json.loads(_lire("station_referentiel_sans_debit.json")))
+        if code == STATION_SANS_DEBIT:
+            return web.json_response(json.loads(_lire("station_referentiel_sans_debit.json")))
+        # Le serveur factice reflète le code demandé (la vraie API
+        # renvoie la station exacte, jamais une autre pour un code exact).
+        enregistrement = json.loads(_lire("station_referentiel.json"))
+        enregistrement["data"][0]["code_station"] = code
+        return web.json_response(enregistrement)
 
     async def observations(request: web.Request) -> web.Response:
         code = request.query.get("code_entite", "")
         grandeur = request.query.get("grandeur_hydro", "")
+        if code == "PANNEQ" and grandeur == "Q":
+            return web.Response(status=500)
+        if code == "ANCIENNE" and grandeur == "H":
+            return web.json_response(json.loads(_lire("observations_h_ancienne.json")))
         if grandeur == "H":
             return web.json_response(json.loads(_lire("observations_h.json")))
         if code == STATION:
@@ -109,3 +117,26 @@ async def test_capteurs_sans_debit(hass: HomeAssistant, client: TestClient) -> N
     debit = _etat(hass, "_debit")
     assert debit is not None
     assert debit.state == "unknown"  # station sans capteur de débit : pas de valeur
+
+
+async def test_erreur_debit_independante(hass: HomeAssistant, client: TestClient) -> None:
+    """Une erreur sur le débit n'empêche pas la hauteur."""
+    hass.config.language = "fr"
+    await _demarrer(hass, client, "PANNEQ")
+    hauteur = _etat(hass, "_hauteur")
+    assert hauteur is not None
+    assert float(hauteur.state) == 1.234
+    debit = _etat(hass, "_debit")
+    assert debit is not None
+    assert debit.state == "unknown"
+
+
+async def test_observation_ancienne_conservee(hass: HomeAssistant, client: TestClient) -> None:
+    """Une réponse réussie mais ancienne garde son horodatage d'origine."""
+    hass.config.language = "fr"
+    await _demarrer(hass, client, "ANCIENNE")
+    hauteur = _etat(hass, "_hauteur")
+    assert hauteur is not None
+    assert float(hauteur.state) == 1.1
+    # Pas de rajeunissement : la date d'origine est exposée telle quelle.
+    assert hauteur.attributes["date_observation"] == "2026-09-01T06:00:00+00:00"
