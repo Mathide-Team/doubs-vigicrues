@@ -1,7 +1,11 @@
 """Client de l'API Hub'Eau (hydrométrie Vigicrues).
 
 Contrat vérifié sur l'API v2 (https://hubeau.eaufrance.fr/page/api-hydrometrie) :
-- ``referentiel/stations?code_station=...`` : métadonnées d'une station ;
+- ``referentiel/stations`` : métadonnées de stations. Le paramètre
+  ``code_station`` accepte plusieurs codes (paramètre répété) et des
+  motifs de recherche — un code exact désigne une seule station. La
+  recherche libre se fait par ``libelle_cours_eau`` (nom du cours
+  d'eau, partiel accepté) ou ``code_commune_station`` (code INSEE) ;
 - ``observations_tr?code_entite=...&grandeur_hydro=H|Q&sort=desc&size=1`` :
   dernière observation temps réel. ``resultat_obs`` est exprimé en
   millimètres pour la hauteur (H) et en litres par seconde pour le débit
@@ -24,6 +28,9 @@ from aiohttp import ClientError, ClientResponseError, ClientSession
 
 BASE_URL = "https://hubeau.eaufrance.fr/api/v2/hydrometrie"
 
+# Bornes raisonnables pour une recherche interactive.
+TAILLE_RECHERCHE_MAX = 50
+
 
 class DoubsVigicruesError(Exception):
     """Erreur de base de l'intégration."""
@@ -34,7 +41,7 @@ class DoubsVigicruesApiError(DoubsVigicruesError):
 
 
 class DoubsVigicruesStationError(DoubsVigicruesError):
-    """La station demandée est introuvable dans le référentiel."""
+    """Une ou plusieurs stations demandées sont introuvables ou ambiguës."""
 
 
 @dataclass(frozen=True)
@@ -114,7 +121,7 @@ class HubeauClient:
         # Lue à l'instanciation : les tests peuvent surcharger api.BASE_URL.
         self._base_url = (base_url or BASE_URL).rstrip("/")
 
-    async def _async_get_json(self, chemin: str, params: dict[str, str]) -> Any:
+    async def _async_get_json(self, chemin: str, params: dict[str, Any]) -> Any:
         """GET protégé : réseau, HTTP et JSON validés."""
         url = f"{self._base_url}/{chemin}"
         try:
@@ -131,22 +138,59 @@ class HubeauClient:
             msg = f"Réponse illisible de Hub'Eau ({chemin})"
             raise DoubsVigicruesApiError(msg) from erreur
 
-    async def async_get_station(self, code: str) -> Station:
-        """Métadonnées d'une station ; erreur dédiée si introuvable.
+    async def async_get_stations(self, codes: list[str]) -> list[Station]:
+        """Métadonnées de stations exactes ; erreur dédiée sinon.
 
-        Le référentiel accepte des motifs de recherche : si la réponse
-        ne désigne pas exactement le code demandé, la saisie est
-        ambiguë plutôt que de prendre la première station trouvée.
+        Le référentiel accepte des motifs de recherche : la réponse doit
+        désigner exactement les codes demandés, chacun une seule fois —
+        un code absent ou ambigu (motif) est refusé plutôt que de
+        prendre la première station trouvée.
         """
-        donnees = await self._async_get_json("referentiel/stations", {"code_station": code, "format": "json"})
+        if not codes:
+            return []
+        params: dict[str, Any] = {
+            "code_station": codes,
+            "format": "json",
+            "size": str(len(codes)),
+        }
+        donnees = await self._async_get_json("referentiel/stations", params)
         enregistrements = donnees.get("data") or []
-        if not enregistrements:
-            msg = f"Station {code} introuvable dans le référentiel Hub'Eau"
+        par_code: dict[str, dict[str, Any]] = {}
+        for enregistrement in enregistrements:
+            code = enregistrement.get("code_station")
+            if code not in codes:
+                msg = f"Codes ambigus : la réponse désigne {code} qui n'est pas un code exact demandé"
+                raise DoubsVigicruesStationError(msg)
+            if code in par_code:
+                msg = f"Le code {code} correspond à plusieurs stations : indiquez un code exact"
+                raise DoubsVigicruesStationError(msg)
+            par_code[code] = enregistrement
+        manquants = sorted(set(codes) - set(par_code))
+        if manquants:
+            msg = f"Stations introuvables dans le référentiel Hub'Eau : {', '.join(manquants)}"
             raise DoubsVigicruesStationError(msg)
-        if enregistrements[0].get("code_station") != code:
-            msg = f"Le code {code} correspond à plusieurs stations : indiquez un code exact"
-            raise DoubsVigicruesStationError(msg)
-        return _parse_station(enregistrements[0])
+        return [_parse_station(par_code[code]) for code in codes]
+
+    async def async_get_station(self, code: str) -> Station:
+        """Métadonnées d'une station exacte."""
+        return (await self.async_get_stations([code]))[0]
+
+    async def async_rechercher_stations(
+        self,
+        cours_eau: str | None = None,
+        code_commune: str | None = None,
+    ) -> list[Station]:
+        """Recherche des stations par cours d'eau (nom partiel) ou commune (code INSEE)."""
+        params: dict[str, Any] = {
+            "format": "json",
+            "size": str(TAILLE_RECHERCHE_MAX),
+        }
+        if cours_eau:
+            params["libelle_cours_eau"] = cours_eau
+        if code_commune:
+            params["code_commune_station"] = code_commune
+        donnees = await self._async_get_json("referentiel/stations", params)
+        return [_parse_station(e) for e in donnees.get("data") or []]
 
     async def async_get_observation(self, code: str, grandeur: str) -> Observation | None:
         """Dernière observation d'une grandeur, ou None si aucune mesure.

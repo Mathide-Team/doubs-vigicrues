@@ -29,20 +29,31 @@ def _lire(nom: str) -> str:
 def _build_app() -> web.Application:
     """Serveur factice reproduisant les routes Hub'Eau."""
 
+    def _enregistrements(codes: list[str]) -> list[dict]:
+        """Enregistrements du référentiel pour les codes demandés."""
+        enregistrements = []
+        for code in codes:
+            if code == STATION:
+                enregistrements.append(json.loads(_lire("station_referentiel.json"))["data"][0])
+            elif code == STATION_SANS_DEBIT:
+                enregistrements.append(json.loads(_lire("station_referentiel_sans_debit.json"))["data"][0])
+        return enregistrements
+
     async def referentiel(request: web.Request) -> web.Response:
-        code = request.query.get("code_station", "")
-        if code == STATION_PANNE:
-            return web.Response(status=500)
-        if code == STATION_MAUVAIS_JSON:
+        codes = request.query.getall("code_station", [])
+        if codes == [STATION_MAUVAIS_JSON]:
             return web.Response(text="pas du tout du json", content_type="text/plain")
-        if code == STATION:
-            return web.json_response(json.loads(_lire("station_referentiel.json")))
-        if code == STATION_SANS_DEBIT:
-            return web.json_response(json.loads(_lire("station_referentiel_sans_debit.json")))
-        if code.endswith("*"):
+        if codes == [STATION_PANNE]:
+            return web.Response(status=500)
+        cours_eau = request.query.get("libelle_cours_eau", "")
+        commune = request.query.get("code_commune_station", "")
+        if cours_eau or commune:
+            # Recherche : toutes les stations connues du serveur factice.
+            return web.json_response({"count": 2, "data": _enregistrements([STATION, STATION_SANS_DEBIT])})
+        if any(c.endswith("*") for c in codes):
             # Motif de recherche : le référentiel renvoie d'autres stations.
             return web.json_response(json.loads(_lire("station_motif.json")))
-        return web.json_response(json.loads(_lire("station_inexistante.json")))
+        return web.json_response({"count": len(_enregistrements(codes)), "data": _enregistrements(codes)})
 
     async def observations(request: web.Request) -> web.Response:
         code = request.query.get("code_entite", "")
@@ -198,3 +209,26 @@ async def test_erreur_reseau(client: TestClient) -> None:
     hubeau = HubeauClient(client.session, base_url="http://127.0.0.1:1")
     with pytest.raises(DoubsVigicruesApiError):
         await hubeau.async_get_station(STATION)
+
+
+async def test_stations_multiples(client: TestClient) -> None:
+    """Plusieurs codes exacts sont récupérés en une requête, dans l'ordre."""
+    stations = await _hubeau(client).async_get_stations([STATION, STATION_SANS_DEBIT])
+    assert [s.code for s in stations] == [STATION, STATION_SANS_DEBIT]
+    assert stations[1].libelle == "Le Douby à Exempleville - Passerelle de Test"
+
+
+async def test_stations_manquante(client: TestClient) -> None:
+    """Un code absent parmi les demandés refuse le lot entier."""
+    with pytest.raises(DoubsVigicruesStationError):
+        await _hubeau(client).async_get_stations([STATION, "U259999003"])
+
+
+async def test_recherche_stations(client: TestClient) -> None:
+    """La recherche par cours d'eau ou commune renvoie les stations."""
+    stations = await _hubeau(client).async_rechercher_stations(cours_eau="Le Douby")
+    assert [s.code for s in stations] == [STATION, STATION_SANS_DEBIT]
+    stations = await _hubeau(client).async_rechercher_stations(code_commune="25056")
+    assert len(stations) == 2
+    stations = await _hubeau(client).async_rechercher_stations()
+    assert stations == []
