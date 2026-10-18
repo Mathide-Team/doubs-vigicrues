@@ -39,6 +39,9 @@ def _build_app() -> web.Application:
             return web.json_response(json.loads(_lire("station_referentiel.json")))
         if code == STATION_SANS_DEBIT:
             return web.json_response(json.loads(_lire("station_referentiel_sans_debit.json")))
+        if code.endswith("*"):
+            # Motif de recherche : le référentiel renvoie d'autres stations.
+            return web.json_response(json.loads(_lire("station_motif.json")))
         return web.json_response(json.loads(_lire("station_inexistante.json")))
 
     async def observations(request: web.Request) -> web.Response:
@@ -48,6 +51,8 @@ def _build_app() -> web.Application:
             return web.json_response(json.loads(_lire("observations_h.json")))
         if code == STATION and grandeur == "Q":
             return web.json_response(json.loads(_lire("observations_q.json")))
+        if code == "NULLE":
+            return web.json_response(json.loads(_lire("observations_nulle.json")))
         if code == STATION_SANS_DEBIT:
             if grandeur == "H":
                 return web.json_response(json.loads(_lire("observations_h.json")))
@@ -118,6 +123,18 @@ async def test_observation_absente(client: TestClient) -> None:
     """Une grandeur sans mesure renvoie None, pas une erreur ni un zéro."""
     observation = await _hubeau(client).async_get_observation(STATION_SANS_DEBIT, "Q")
     assert observation is None
+
+
+async def test_observation_sans_valeur(client: TestClient) -> None:
+    """Un enregistrement avec resultat_obs nul n'est pas une mesure."""
+    observation = await _hubeau(client).async_get_observation("NULLE", "H")
+    assert observation is None
+
+
+async def test_motif_ambigu(client: TestClient) -> None:
+    """Un motif de recherche ne configure pas la première station venue."""
+    with pytest.raises(DoubsVigicruesStationError):
+        await _hubeau(client).async_get_station("U2599*")
 
 
 async def test_valeur_zero(client: TestClient) -> None:

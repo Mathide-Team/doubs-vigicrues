@@ -1,0 +1,7 @@
+{
+  "count": 1,
+  "api_version": "2.0.1",
+  "data": [
+    {"code_station": "U259999001", "date_obs": "2026-10-18T15:00:00Z", "resultat_obs": null, "code_continuite": 0, "libelle_continuite": "Continue"}
+  ]
+}

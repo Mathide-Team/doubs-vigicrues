@@ -60,15 +60,25 @@ class DoubsVigicruesCoordinator(DataUpdateCoordinator[StationData]):
         return self._code
 
     async def _async_update_data(self) -> StationData:
-        """Récupère la station puis ses dernières observations."""
+        """Récupère la station puis ses dernières observations.
+
+        La hauteur et le débit sont indépendants : un échec du débit
+        (grandeur facultative) n'empêche pas la mise à jour de la
+        hauteur — l'erreur est journalisée et le capteur reste sans
+        valeur.
+        """
         try:
             station = await self._client.async_get_station(self._code)
             hauteur = await self._client.async_get_observation(self._code, GRANDEUR_HAUTEUR)
-            debit = await self._client.async_get_observation(self._code, GRANDEUR_DEBIT)
         except DoubsVigicruesApiError as erreur:
             msg = f"Mise à jour impossible : {erreur}"
             raise UpdateFailed(msg) from erreur
         except DoubsVigicruesError as erreur:  # pragma: no cover - station supprimée
             msg = f"Station {self._code} devenue introuvable : {erreur}"
             raise UpdateFailed(msg) from erreur
+        try:
+            debit = await self._client.async_get_observation(self._code, GRANDEUR_DEBIT)
+        except DoubsVigicruesError as erreur:
+            LOGGER.warning("Débit indisponible pour %s : %s", self._code, erreur)
+            debit = None
         return StationData(station=station, hauteur=hauteur, debit=debit)
