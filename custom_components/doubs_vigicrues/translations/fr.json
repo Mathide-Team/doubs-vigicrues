@@ -2,24 +2,86 @@
   "config": {
     "step": {
       "user": {
-        "description": "Suivi d'une station hydrométrique Vigicrues (données Hub'Eau, sans clé). Par défaut : le Doubs à Besançon - Moulin Saint-Paul.",
+        "description": "Suivi de stations hydrométriques Vigicrues (données Hub'Eau, sans clé). Suggestion initiale : le Doubs à Besançon - Moulin Saint-Paul. Indiquez un ou plusieurs codes de stations, séparés par des virgules ou des espaces, ou lancez une recherche.",
         "data": {
-          "station": "Code de la station Vigicrues"
+          "stations": "Codes des stations",
+          "chercher": "Chercher des stations (cours d'eau ou commune)"
+        }
+      },
+      "recherche": {
+        "description": "Recherchez des stations par nom de cours d'eau (partiel accepté) ou par code INSEE de commune. Au moins un critère.",
+        "data": {
+          "cours_eau": "Nom du cours d'eau",
+          "code_commune": "Code INSEE de la commune"
+        }
+      },
+      "resultats": {
+        "description": "Sélectionnez les stations à suivre.",
+        "data": {
+          "stations": "Stations trouvées"
         }
       }
     },
     "error": {
       "cannot_connect": "Impossible de joindre l'API Hub'Eau.",
-      "station_inconnue": "Station introuvable dans le référentiel : vérifiez le code."
+      "station_inconnue": "Station introuvable ou code ambigu : vérifiez les codes exacts.",
+      "codes_vides": "Indiquez au moins un code de station.",
+      "au_moins_un_critere": "Renseignez un nom de cours d'eau ou un code INSEE de commune.",
+      "aucune_trouvee": "Aucune station ne correspond à ces critères.",
+      "deja_suivie": "Une de ces stations est déjà suivie par une autre entrée."
     },
     "abort": {
-      "already_configured": "Cette station est déjà configurée."
+      "already_configured": "Ces stations sont déjà configurées."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "description": "Désélectionnez une station pour la retirer. Cochez « Ajouter » pour en ajouter d'autres.",
+        "data": {
+          "stations": "Stations suivies",
+          "ajouter": "Ajouter des stations"
+        }
+      },
+      "ajout": {
+        "description": "Codes des stations à ajouter, séparés par des virgules ou des espaces, ou lancez une recherche.",
+        "data": {
+          "stations": "Codes des stations",
+          "chercher": "Chercher des stations (cours d'eau ou commune)"
+        }
+      },
+      "recherche": {
+        "description": "Recherchez des stations à ajouter par nom de cours d'eau (partiel accepté) ou par code INSEE de commune. Au moins un critère.",
+        "data": {
+          "cours_eau": "Nom du cours d'eau",
+          "code_commune": "Code INSEE de la commune"
+        }
+      },
+      "resultats": {
+        "description": "Sélectionnez les stations à ajouter.",
+        "data": {
+          "stations": "Stations trouvées"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Impossible de joindre l'API Hub'Eau.",
+      "station_inconnue": "Station introuvable ou code ambigu : vérifiez les codes exacts.",
+      "codes_vides": "Indiquez au moins un code de station.",
+      "au_moins_un_critere": "Renseignez un nom de cours d'eau ou un code INSEE de commune.",
+      "aucune_trouvee": "Aucune station ne correspond à ces critères.",
+      "au_moins_une_station": "Conservez au moins une station.",
+      "deja_suivie": "Une de ces stations est déjà suivie par une autre entrée."
     }
   },
   "entity": {
     "sensor": {
-      "hauteur": { "name": "Hauteur" },
-      "debit": { "name": "Débit" }
+      "hauteur": {
+        "name": "Hauteur"
+      },
+      "debit": {
+        "name": "Débit"
+      }
     }
   }
 }

@@ -7,10 +7,15 @@ import logging
 DOMAIN = "doubs_vigicrues"
 LOGGER = logging.getLogger(__name__)
 
-# Le Doubs à Besançon - Moulin Saint-Paul (référentiel Hub'Eau).
+# Le Doubs à Besançon - Moulin Saint-Paul (référentiel Hub'Eau),
+# simple suggestion initiale : n'importe quelle station Vigicrues peut
+# être suivie.
 DEFAULT_STATION = "U251201001"
 
+# Schéma v1 (une entrée = une station, clé « station »).
 CONF_STATION = "station"
+# Schéma v2 : liste de stations suivies par l'entrée.
+CONF_STATIONS = "stations"
 
 # Rafraîchissement : les stations Vigicrues mesurent toutes les 5 à 60 min.
 UPDATE_INTERVAL_MIN = 15

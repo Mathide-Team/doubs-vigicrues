@@ -17,6 +17,13 @@ clé ni compte n'est nécessaire.
   la hauteur indisponible.
 - Attributs de chaque capteur : date de l'observation (UTC), continuité de
   la mesure, commune, cours d'eau et altitude de référence de la station.
+- **Plusieurs stations par entrée** : codes séparés par des virgules ou
+  des espaces, ou recherche par nom de cours d'eau (partiel accepté) ou
+  code INSEE de commune. Les options permettent d'ajouter et de retirer
+  des stations sans tout reconfigurer.
+- **Carte des stations** : le capteur de hauteur porte les attributs
+  `latitude`/`longitude` de sa station — la [carte « map »](https://www.home-assistant.io/dashboards/map/)
+  de Home Assistant affiche un marqueur par station (voir plus bas).
 - Choix de la station par son code Vigicrues (le libellé réel est vérifié
   à la configuration). La valeur 0 ou négative est conservée telle quelle :
   c'est une mesure, pas un défaut.
@@ -40,15 +47,35 @@ Copiez le dossier `custom_components/doubs_vigicrues` dans le dossier
 ## Configuration
 
 1. Ajoutez l'intégration « Niveau du Doubs (Vigicrues) ».
-2. Renseignez le code de la station (prérempli avec `U251201001`,
-   Le Doubs à Besançon - Moulin Saint-Paul). Les codes d'autres stations
-   sont consultables sur
+2. Renseignez un ou plusieurs codes de stations (prérempli avec
+   `U251201001`, Le Doubs à Besançon - Moulin Saint-Paul), séparés par
+   des virgules ou des espaces — ou cochez « Chercher » pour trouver
+   des stations par nom de cours d'eau ou code INSEE de commune. Les
+   codes d'autres stations sont consultables sur
    [Hub'Eau](https://hubeau.eaufrance.fr/page/api-hydrometrie) ou
    [Vigicrues](https://www.vigicrues.gouv.fr).
-3. Les capteurs apparaissent sur l'appareil portant le nom de la station.
+3. Les capteurs apparaissent sur un appareil par station, portant le nom
+   réel de la station.
+4. Dans les options de l'intégration : désélectionnez une station pour
+   la retirer, cochez « Ajouter » pour en ajouter d'autres.
 
-Une entrée par station : ajoutez l'intégration plusieurs fois pour suivre
-plusieurs stations.
+Les entrées créées en 0.1.0 (une entrée par station) sont migrées
+automatiquement : appareils, capteurs et personnalisations sont conservés.
+
+## Carte des stations
+
+Chaque capteur de hauteur expose `latitude` et `longitude` : la carte
+« map » intégrée affiche donc toutes vos stations suivies.
+
+```yaml
+type: map
+entities:
+  - sensor.le_doubs_a_besancon_moulin_saint_paul_hauteur
+  - sensor.le_doubs_a_mouthe_hauteur
+```
+
+Un seul marqueur par station : le capteur de débit ne porte pas les
+coordonnées.
 
 ## Sources
 

@@ -1,0 +1,15 @@
+{
+  "count": 1,
+  "first": "https://exemple.invalid/",
+  "next": null,
+  "prev": null,
+  "data": [
+    {
+      "code_station": "U259999002",
+      "date_obs": "2026-10-18T15:00:00Z",
+      "grandeur_hydro": "H",
+      "resultat_obs": 2500,
+      "libelle_continuite": "Continue"
+    }
+  ]
+}

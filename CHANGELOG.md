@@ -1,5 +1,20 @@
 # Journal des versions
 
+## 0.2.0 — 18/10/2026
+
+- Une entrée suit désormais **plusieurs stations** : codes séparés par
+  des virgules ou des espaces à la configuration, ajout et retrait dans
+  les options. Migration automatique des entrées 0.1.0 (appareils et
+  capteurs conservés).
+- **Recherche de stations** par nom de cours d'eau (partiel accepté)
+  ou code INSEE de commune, avec sélection multiple.
+- **Carte des stations** : le capteur de hauteur expose les attributs
+  `latitude`/`longitude` — la carte « map » de Home Assistant affiche
+  un marqueur par station.
+- Indépendance renforcée : la panne d'une station ne rend pas les
+  autres indisponibles, et une station disparue du référentiel est
+  ignorée sans bloquer l'entrée.
+
 ## 0.1.0 — 18/10/2026
 
 - Version initiale : hauteur d'eau (m) et débit (m³/s) d'une station
