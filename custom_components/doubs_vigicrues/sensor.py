@@ -1,4 +1,4 @@
-"""Capteurs de hauteur et de débit d'une station Vigicrues."""
+"""Capteurs de hauteur et de débit des stations Vigicrues."""
 
 from __future__ import annotations
 
@@ -19,33 +19,41 @@ from .const import DOMAIN
 from .coordinator import DoubsVigicruesCoordinator, StationData
 
 if TYPE_CHECKING:
-    from homeassistant.config_entries import ConfigEntry
+    from . import DoubsVigicruesConfigEntry
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: DoubsVigicruesConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Crée les capteurs de la station de l'entrée."""
-    coordinator: DoubsVigicruesCoordinator = entry.runtime_data
-    async_add_entities(
-        [
-            DoubsVigicruesHauteurSensor(coordinator),
-            DoubsVigicruesDebitSensor(coordinator),
-        ]
-    )
+    """Crée les capteurs de chaque station suivie par l'entrée."""
+    coordinateurs: dict[str, DoubsVigicruesCoordinator] = entry.runtime_data
+    entites = []
+    for coordinateur in coordinateurs.values():
+        entites.append(
+            DoubsVigicruesHauteurSensor(coordinateur),
+        )
+        entites.append(
+            DoubsVigicruesDebitSensor(coordinateur),
+        )
+    async_add_entities(entites)
+    # La plateforme publie sa fonction d'ajout : les stations résolues
+    # plus tard (référentiel indisponible au démarrage) pourront créer
+    # leurs capteurs sans recharger l'entrée.
+    hass.data[DOMAIN][entry.entry_id]["ajouter_entites"] = async_add_entities
 
 
 def _informations_station(
-    data: StationData,
+    coordinateur: DoubsVigicruesCoordinator,
 ) -> DeviceInfo:
     """Appareil portant le nom réel de la station."""
+    station = coordinateur.station
     return DeviceInfo(
-        identifiers={(DOMAIN, data.station.code)},
-        name=data.station.libelle,
+        identifiers={(DOMAIN, station.code)},
+        name=station.libelle,
         manufacturer="Vigicrues (Hub'Eau)",
-        model=data.station.cours_eau or "Station hydrométrique",
+        model=station.cours_eau or "Station hydrométrique",
         configuration_url="https://www.vigicrues.gouv.fr",
     )
 
@@ -62,7 +70,7 @@ class DoubsVigicruesHauteurSensor(CoordinatorEntity[DoubsVigicruesCoordinator], 
     def __init__(self, coordinator: DoubsVigicruesCoordinator) -> None:
         super().__init__(coordinator)
         self._attr_unique_id = f"{coordinator.code}_hauteur"
-        self._attr_device_info = _informations_station(coordinator.data)
+        self._attr_device_info = _informations_station(coordinator)
 
     @property
     def native_value(self) -> float | None:
@@ -73,17 +81,31 @@ class DoubsVigicruesHauteurSensor(CoordinatorEntity[DoubsVigicruesCoordinator], 
 
     @property
     def extra_state_attributes(self) -> dict[str, object]:
-        """Date, continuité et contexte de la dernière mesure."""
-        data = self.coordinator.data
-        if data is None or data.hauteur is None:
-            return {}
-        return {
-            "date_observation": data.hauteur.date_obs.isoformat(),
-            "continuite": data.hauteur.continuite,
-            "commune": data.station.commune,
-            "cours_eau": data.station.cours_eau,
-            "altitude_reference_m": data.station.altitude,
+        """Contexte de la station et de la dernière mesure de hauteur.
+
+        Les attributs géographiques (commune, cours d'eau, altitude,
+        coordonnées) viennent des métadonnées de la station : ils restent
+        présents même sans mesure de hauteur. La date et la continuité
+        ne sont exposées que lorsqu'une observation existe.
+
+        La latitude et la longitude sont exposées sur ce seul capteur (et
+        pas sur le débit) : la carte « map » de Home Assistant affiche
+        ainsi un marqueur unique par station.
+        """
+        station = self.coordinator.station
+        attributs: dict[str, object] = {
+            "commune": station.commune,
+            "cours_eau": station.cours_eau,
+            "altitude_reference_m": station.altitude,
         }
+        if station.latitude is not None and station.longitude is not None:
+            attributs["latitude"] = station.latitude
+            attributs["longitude"] = station.longitude
+        data: StationData | None = self.coordinator.data
+        if data is not None and data.hauteur is not None:
+            attributs["date_observation"] = data.hauteur.date_obs.isoformat()
+            attributs["continuite"] = data.hauteur.continuite
+        return attributs
 
 
 class DoubsVigicruesDebitSensor(CoordinatorEntity[DoubsVigicruesCoordinator], SensorEntity):
@@ -97,7 +119,7 @@ class DoubsVigicruesDebitSensor(CoordinatorEntity[DoubsVigicruesCoordinator], Se
     def __init__(self, coordinator: DoubsVigicruesCoordinator) -> None:
         super().__init__(coordinator)
         self._attr_unique_id = f"{coordinator.code}_debit"
-        self._attr_device_info = _informations_station(coordinator.data)
+        self._attr_device_info = _informations_station(coordinator)
 
     @property
     def native_value(self) -> float | None:
@@ -109,7 +131,7 @@ class DoubsVigicruesDebitSensor(CoordinatorEntity[DoubsVigicruesCoordinator], Se
     @property
     def extra_state_attributes(self) -> dict[str, object]:
         """Date et continuité de la dernière mesure de débit."""
-        data = self.coordinator.data
+        data: StationData | None = self.coordinator.data
         if data is None or data.debit is None:
             return {}
         return {
