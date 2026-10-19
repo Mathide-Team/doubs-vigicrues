@@ -1,4 +1,4 @@
-# CI du socle Mathide-Team. Le job « Qualité (lint, tests) » est un check
+# CI du socle Mathilde-Team. Le job « Qualité (lint, tests) » est un check
 # requis sur main et dev (.github/branch-protection/*.json) : garder son nom.
 name: CI
 
@@ -36,7 +36,7 @@ jobs:
 
       - name: Notes de la version du manifest (CHANGELOG)
         run: |
-          version="$(uv run --no-project python -c 'import json; print(json.load(open("custom_components/doubs_vigicrues/manifest.json"))["version"])')"
+          version="$(uv run --no-project python -c 'import json; print(json.load(open("custom_components/vigicrues_hubeau/manifest.json"))["version"])')"
           uv run --no-project python scripts/notes_de_version.py "v${version}" > /dev/null
 
       - name: Lint et format (ruff)

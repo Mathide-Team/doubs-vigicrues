@@ -12,7 +12,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.doubs_vigicrues.const import DOMAIN
+from custom_components.vigicrues_hubeau.const import DOMAIN
 
 FIXTURES = Path(__file__).parent / "fixtures"
 STATION = "U259999001"
@@ -133,7 +133,7 @@ async def _demarrer(
     """Charge l'intégration en pointant Hub'Eau vers le serveur factice."""
     with pytest.MonkeyPatch.context() as monkeypatch:
         monkeypatch.setattr(
-            "custom_components.doubs_vigicrues.api.BASE_URL",
+            "custom_components.vigicrues_hubeau.api.BASE_URL",
             str(client.make_url("/")),
         )
         if donnees is None:
@@ -256,7 +256,7 @@ async def test_panne_station_independante(hass: HomeAssistant, client: TestClien
         # de récupération : il englobe donc toute la suite du test.
         with pytest.MonkeyPatch.context() as monkeypatch:
             monkeypatch.setattr(
-                "custom_components.doubs_vigicrues.api.BASE_URL",
+                "custom_components.vigicrues_hubeau.api.BASE_URL",
                 str(serveur.make_url("/")),
             )
             entry = MockConfigEntry(
@@ -335,7 +335,7 @@ async def test_referentiel_panne_partielle(hass: HomeAssistant, client: TestClie
     try:
         with pytest.MonkeyPatch.context() as monkeypatch:
             monkeypatch.setattr(
-                "custom_components.doubs_vigicrues.api.BASE_URL",
+                "custom_components.vigicrues_hubeau.api.BASE_URL",
                 str(serveur.make_url("/")),
             )
             entry = MockConfigEntry(
@@ -363,7 +363,7 @@ async def test_migration_conserve_personnalisation(hass: HomeAssistant, client: 
 
     with pytest.MonkeyPatch.context() as monkeypatch:
         monkeypatch.setattr(
-            "custom_components.doubs_vigicrues.api.BASE_URL",
+            "custom_components.vigicrues_hubeau.api.BASE_URL",
             str(client.make_url("/")),
         )
         entry = MockConfigEntry(domain=DOMAIN, data={"station": STATION}, unique_id=STATION, version=1)
@@ -393,7 +393,7 @@ async def test_options_rechargent_les_capteurs(hass: HomeAssistant, client: Test
     hass.config.language = "fr"
     with pytest.MonkeyPatch.context() as monkeypatch:
         monkeypatch.setattr(
-            "custom_components.doubs_vigicrues.api.BASE_URL",
+            "custom_components.vigicrues_hubeau.api.BASE_URL",
             str(client.make_url("/")),
         )
         entry = MockConfigEntry(
@@ -477,7 +477,7 @@ async def test_station_en_attente_recuperee(hass: HomeAssistant, client: TestCli
     try:
         with pytest.MonkeyPatch.context() as monkeypatch:
             monkeypatch.setattr(
-                "custom_components.doubs_vigicrues.api.BASE_URL",
+                "custom_components.vigicrues_hubeau.api.BASE_URL",
                 str(serveur.make_url("/")),
             )
             entry = MockConfigEntry(
@@ -526,7 +526,7 @@ async def test_migration_registre_preexistant(hass: HomeAssistant, client: TestC
 
     with pytest.MonkeyPatch.context() as monkeypatch:
         monkeypatch.setattr(
-            "custom_components.doubs_vigicrues.api.BASE_URL",
+            "custom_components.vigicrues_hubeau.api.BASE_URL",
             str(client.make_url("/")),
         )
         entry = MockConfigEntry(domain=DOMAIN, data={"station": STATION}, unique_id=STATION, version=1)
@@ -599,7 +599,7 @@ async def test_retentative_obsolete(hass: HomeAssistant, client: TestClient) -> 
     try:
         with pytest.MonkeyPatch.context() as monkeypatch:
             monkeypatch.setattr(
-                "custom_components.doubs_vigicrues.api.BASE_URL",
+                "custom_components.vigicrues_hubeau.api.BASE_URL",
                 str(serveur.make_url("/")),
             )
             entry = MockConfigEntry(
@@ -667,7 +667,7 @@ async def test_station_en_attente_temporisation(hass: HomeAssistant, client: Tes
     try:
         with pytest.MonkeyPatch.context() as monkeypatch:
             monkeypatch.setattr(
-                "custom_components.doubs_vigicrues.api.BASE_URL",
+                "custom_components.vigicrues_hubeau.api.BASE_URL",
                 str(serveur.make_url("/")),
             )
             entry = MockConfigEntry(

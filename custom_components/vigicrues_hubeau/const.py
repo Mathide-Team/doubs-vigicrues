@@ -1,10 +1,10 @@
-"""Constantes de l'intégration Niveau du Doubs (Vigicrues)."""
+"""Constantes de l'intégration Vigicrues (niveaux des cours d'eau)."""
 
 from __future__ import annotations
 
 import logging
 
-DOMAIN = "doubs_vigicrues"
+DOMAIN = "vigicrues_hubeau"
 LOGGER = logging.getLogger(__name__)
 
 # Le Doubs à Besançon - Moulin Saint-Paul (référentiel Hub'Eau),

@@ -1,5 +1,18 @@
 # Journal des versions
 
+## [0.3.0] — 19/10/2026
+
+- **Renommage** : l'intégration s'appelle « Vigicrues (niveaux des cours
+  d'eau) », domaine `vigicrues_hubeau`, dépôt `Mathilde-Team/Vigicrues`
+  (#10). Toute station hydrométrique Vigicrues de France peut être suivie.
+  **Changement incompatible** : supprimer l'ancienne entrée
+  `doubs_vigicrues` et ajouter la nouvelle intégration (voir « Migration
+  depuis doubs-vigicrues » dans le README).
+- Tableau de bord d'exemple : niveaux, fraîcheur des mesures, courbe et
+  carte (#11).
+- Release : notes de version vérifiées en CI, workflow avec le Python de
+  uv (#7, #13).
+
 ## [0.2.0] — 18/10/2026
 
 - Une entrée suit désormais **plusieurs stations** : codes séparés par

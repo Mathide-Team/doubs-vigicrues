@@ -1,7 +1,7 @@
 [project]
-name = "doubs-vigicrues"
+name = "vigicrues"
 version = "0.1.0"
-description = "Niveau du Doubs (Vigicrues/Hubeau) pour Home Assistant"
+description = "Niveaux et débits des cours d'eau (Vigicrues/Hub'Eau) pour Home Assistant"
 requires-python = ">=3.13.2,<3.14"
 license = "MIT"
 
@@ -26,7 +26,7 @@ extend-exclude = ["scripts/check_branch_protection.py"]  # script du socle (mode
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
 
 [tool.coverage.run]
-source = ["custom_components/doubs_vigicrues"]
+source = ["custom_components/vigicrues_hubeau"]
 
 [tool.uv]
 package = false  # intégration HA, pas un paquet Python publié

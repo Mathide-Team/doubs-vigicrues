@@ -1,4 +1,4 @@
-"""Intégration « Niveau du Doubs (Vigicrues) » : stations hydrométriques."""
+"""Intégration « Vigicrues (niveaux des cours d'eau) » : stations hydrométriques."""
 
 from __future__ import annotations
 
@@ -13,13 +13,13 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.event import async_call_later
 
-from .api import DoubsVigicruesError, HubeauClient, Station
+from .api import HubeauClient, Station, VigicruesError
 from .const import CONF_STATION, CONF_STATIONS, DOMAIN, LOGGER
-from .coordinator import DoubsVigicruesCoordinator
+from .coordinator import VigicruesCoordinator
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 
-type DoubsVigicruesConfigEntry = ConfigEntry[dict[str, DoubsVigicruesCoordinator]]
+type VigicruesConfigEntry = ConfigEntry[dict[str, VigicruesCoordinator]]
 
 VERSION_ACTUELLE = 2
 
@@ -28,7 +28,7 @@ VERSION_ACTUELLE = 2
 DELAI_REESSAI_S = 60
 
 
-async def async_migrate_entry(hass: HomeAssistant, entry: DoubsVigicruesConfigEntry) -> bool:
+async def async_migrate_entry(hass: HomeAssistant, entry: VigicruesConfigEntry) -> bool:
     """Fait évoluer les entrées anciennes sans casser les entités.
 
     v1 : une entrée par station, ``data = {"station": code}`` ;
@@ -54,7 +54,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry: DoubsVigicruesConfigEn
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: DoubsVigicruesConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: VigicruesConfigEntry) -> bool:
     """Prépare un coordinateur par station suivie.
 
     Les stations sont indépendantes : une station en panne ne bloque
@@ -64,7 +64,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: DoubsVigicruesConfigEntr
     """
     client = HubeauClient(async_get_clientsession(hass))
     codes: list[str] = list(entry.data.get(CONF_STATIONS) or [])
-    coordinateurs: dict[str, DoubsVigicruesCoordinator] = {}
+    coordinateurs: dict[str, VigicruesCoordinator] = {}
     en_attente: list[str] = []
     # Chaque station est résolue individuellement : une erreur sur l'une
     # (API injoignable pour ce code, station disparue du référentiel) ne
@@ -72,7 +72,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: DoubsVigicruesConfigEntr
     for code in codes:
         try:
             station = await client.async_get_station(code)
-        except DoubsVigicruesError as erreur:
+        except VigicruesError as erreur:
             LOGGER.warning("Station %s en attente : %s", code, erreur)
             en_attente.append(code)
             continue
@@ -132,7 +132,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: DoubsVigicruesConfigEntr
                 continue
             try:
                 station = await client.async_get_station(code)
-            except DoubsVigicruesError as erreur:
+            except VigicruesError as erreur:
                 LOGGER.debug("Station %s toujours en attente : %s", code, erreur)
                 restants.append(code)
                 continue
@@ -142,7 +142,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: DoubsVigicruesConfigEntr
                 return
             if code not in set(entry.data.get(CONF_STATIONS) or []):
                 continue
-            coordinateur = DoubsVigicruesCoordinator(hass, entry, client, station)
+            coordinateur = VigicruesCoordinator(hass, entry, client, station)
             # Hors installation, un simple rafraîchissement (tolérant) :
             # le « premier rafraîchissement » n'est valide qu'à l'installation.
             await coordinateur.async_refresh()
@@ -155,12 +155,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: DoubsVigicruesConfigEntr
             coordinateurs[station.code] = coordinateur
             entry.runtime_data = coordinateurs
             if donnees["ajouter_entites"] is not None:
-                from .sensor import DoubsVigicruesDebitSensor, DoubsVigicruesHauteurSensor
+                from .sensor import VigicruesDebitSensor, VigicruesHauteurSensor
 
                 donnees["ajouter_entites"](
                     [
-                        DoubsVigicruesHauteurSensor(coordinateur),
-                        DoubsVigicruesDebitSensor(coordinateur),
+                        VigicruesHauteurSensor(coordinateur),
+                        VigicruesDebitSensor(coordinateur),
                     ]
                 )
         if not _courante():
@@ -179,13 +179,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: DoubsVigicruesConfigEntr
 
 async def _creer_coordinateur(
     hass: HomeAssistant,
-    entry: DoubsVigicruesConfigEntry,
+    entry: VigicruesConfigEntry,
     client: HubeauClient,
     station: Station,
-    coordinateurs: dict[str, DoubsVigicruesCoordinator],
-) -> DoubsVigicruesCoordinator:
+    coordinateurs: dict[str, VigicruesCoordinator],
+) -> VigicruesCoordinator:
     """Crée le coordinateur d'une station, premier rafraîchissement tolérant."""
-    coordinateur = DoubsVigicruesCoordinator(hass, entry, client, station)
+    coordinateur = VigicruesCoordinator(hass, entry, client, station)
     try:
         await coordinateur.async_config_entry_first_refresh()
     except ConfigEntryNotReady:
@@ -194,7 +194,7 @@ async def _creer_coordinateur(
     return coordinateur
 
 
-async def _async_recharger(hass: HomeAssistant, entry: DoubsVigicruesConfigEntry) -> None:
+async def _async_recharger(hass: HomeAssistant, entry: VigicruesConfigEntry) -> None:
     """Recharge l'entrée quand la liste des stations change (options).
 
     Les stations retirées sont détachées proprement : leurs entités sont
@@ -211,7 +211,7 @@ async def _async_recharger(hass: HomeAssistant, entry: DoubsVigicruesConfigEntry
     _detacher_stations(hass, entry, anciens - nouveaux)
 
 
-def _detacher_stations(hass: HomeAssistant, entry: DoubsVigicruesConfigEntry, codes: set[str]) -> None:
+def _detacher_stations(hass: HomeAssistant, entry: VigicruesConfigEntry, codes: set[str]) -> None:
     """Supprime du registre les entités et appareils des stations retirées."""
     if not codes:
         return
@@ -227,7 +227,7 @@ def _detacher_stations(hass: HomeAssistant, entry: DoubsVigicruesConfigEntry, co
             registre_appareils.async_remove_device(appareil.id)
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: DoubsVigicruesConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: VigicruesConfigEntry) -> bool:
     """Décharge les entités de l'entrée."""
     retour = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)

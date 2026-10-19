@@ -689,7 +689,7 @@ wheels = [
 ]
 
 [[package]]
-name = "doubs-vigicrues"
+name = "vigicrues"
 version = "0.1.0"
 source = { virtual = "." }
 
