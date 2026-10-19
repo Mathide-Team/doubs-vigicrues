@@ -1,6 +1,6 @@
 # Publication d'une version : pousser un tag vX.Y.Z égal à la version de
 # manifest.json, après avoir daté sa section dans CHANGELOG.md. HACS installe
-# ensuite la version depuis la release (zip de custom_components/doubs_vigicrues).
+# ensuite la version depuis la release (zip de custom_components/vigicrues_hubeau).
 name: Release
 
 "on":
@@ -18,15 +18,19 @@ jobs:
       - name: Checkout du dépôt
         uses: actions/checkout@v7
 
+      # python3 du runner maison trop ancien (str.removeprefix : Python ≥ 3.9).
+      - name: Installation de uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+
       - name: Tag = version du manifest, notes tirées du CHANGELOG
-        run: python3 scripts/notes_de_version.py "${GITHUB_REF_NAME}" > notes.md
+        run: uv run --no-project python scripts/notes_de_version.py "${GITHUB_REF_NAME}" > notes.md
 
       - name: Archive de l'intégration
-        run: cd custom_components/doubs_vigicrues && python3 -m zipfile -c ../../doubs_vigicrues.zip .
+        run: cd custom_components/vigicrues_hubeau && uv run --no-project python -m zipfile -c ../../vigicrues_hubeau.zip .
 
       - name: Release GitHub
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           body_path: notes.md
-          files: doubs_vigicrues.zip
+          files: vigicrues_hubeau.zip
           fail_on_unmatched_files: true

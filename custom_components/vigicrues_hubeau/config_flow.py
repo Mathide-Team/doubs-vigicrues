@@ -15,7 +15,7 @@ from homeassistant.core import callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .api import DoubsVigicruesApiError, DoubsVigicruesStationError, HubeauClient, Station
+from .api import HubeauClient, Station, VigicruesApiError, VigicruesStationError
 from .const import DEFAULT_STATION, DOMAIN
 
 # Codes séparés par des virgules ou des espaces.
@@ -61,7 +61,7 @@ def _client(hass: Any) -> HubeauClient:
     return HubeauClient(async_get_clientsession(hass))
 
 
-class DoubsVigicruesConfigFlow(ConfigFlow, domain=DOMAIN):
+class VigicruesConfigFlow(ConfigFlow, domain=DOMAIN):
     """Étapes de configuration : une entrée suit plusieurs stations."""
 
     VERSION = 2
@@ -86,9 +86,9 @@ class DoubsVigicruesConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._abort_if_unique_id_configured()
                 try:
                     stations = await _client(self.hass).async_get_stations(codes)
-                except DoubsVigicruesStationError:
+                except VigicruesStationError:
                     erreurs["stations"] = "station_inconnue"
-                except DoubsVigicruesApiError:
+                except VigicruesApiError:
                     erreurs["base"] = "cannot_connect"
                 else:
                     conflit = self._conflit_stations(codes)
@@ -121,7 +121,7 @@ class DoubsVigicruesConfigFlow(ConfigFlow, domain=DOMAIN):
                         cours_eau=cours_eau or None,
                         code_commune=code_commune or None,
                     )
-                except DoubsVigicruesApiError:
+                except VigicruesApiError:
                     erreurs["base"] = "cannot_connect"
                 else:
                     if not resultats:
@@ -183,12 +183,12 @@ class DoubsVigicruesConfigFlow(ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     @callback
-    def async_get_options_flow(entry: Any) -> DoubsVigicruesOptionsFlow:
+    def async_get_options_flow(entry: Any) -> VigicruesOptionsFlow:
         """Options : gérer la liste des stations suivies."""
-        return DoubsVigicruesOptionsFlow()
+        return VigicruesOptionsFlow()
 
 
-class DoubsVigicruesOptionsFlow(OptionsFlow):
+class VigicruesOptionsFlow(OptionsFlow):
     """Ajout et retrait de stations dans l'entrée existante."""
 
     def __init__(self) -> None:
@@ -236,9 +236,9 @@ class DoubsVigicruesOptionsFlow(OptionsFlow):
             else:
                 try:
                     await _client(self.hass).async_get_stations(codes)
-                except DoubsVigicruesStationError:
+                except VigicruesStationError:
                     erreurs["stations"] = "station_inconnue"
-                except DoubsVigicruesApiError:
+                except VigicruesApiError:
                     erreurs["base"] = "cannot_connect"
                 else:
                     return await self._enregistrer(self._conservees + codes)
@@ -267,7 +267,7 @@ class DoubsVigicruesOptionsFlow(OptionsFlow):
                         cours_eau=cours_eau or None,
                         code_commune=code_commune or None,
                     )
-                except DoubsVigicruesApiError:
+                except VigicruesApiError:
                     erreurs["base"] = "cannot_connect"
                 else:
                     if not resultats:

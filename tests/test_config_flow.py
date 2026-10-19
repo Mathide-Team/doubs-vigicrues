@@ -13,7 +13,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.doubs_vigicrues.const import DEFAULT_STATION, DOMAIN
+from custom_components.vigicrues_hubeau.const import DEFAULT_STATION, DOMAIN
 
 FIXTURES = Path(__file__).parent / "fixtures"
 STATION = "U259999001"
@@ -93,7 +93,7 @@ async def client():
 def api_locale(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     """Pointe le client Hub'Eau vers le serveur factice pendant tout le test."""
     monkeypatch.setattr(
-        "custom_components.doubs_vigicrues.api.BASE_URL",
+        "custom_components.vigicrues_hubeau.api.BASE_URL",
         str(client.make_url("/")),
     )
     return client

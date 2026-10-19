@@ -1,7 +1,7 @@
 {
-  "name": "Niveau du Doubs (Vigicrues)",
+  "name": "Vigicrues (niveaux des cours d'eau)",
   "render_readme": true,
   "homeassistant": "2026.3.0",
   "zip_release": true,
-  "filename": "doubs_vigicrues.zip"
+  "filename": "vigicrues_hubeau.zip"
 }

@@ -1,0 +1,72 @@
+# Tableau de bord Vigicrues (issue #11).
+#
+# Vue Lovelace prête à coller : Paramètres → Tableaux de bord → ouvrir un
+# tableau de bord → ⋮ → Modifier → ⋮ → Éditeur de configuration, puis
+# ajouter cette vue dans « views: ».
+#
+# Seules des cartes intégrées à Home Assistant sont utilisées. Les cartes
+# Markdown parcourent toutes les entités de l'intégration
+# (integration_entities('vigicrues_hubeau')) : rien à adapter, les stations
+# ajoutées apparaissent d'elles-mêmes.
+#
+# Les cartes « history-graph » et « map » demandent des entités
+# explicites : remplacer les capteurs d'exemple (Besançon, Mouthe) par les vôtres
+# (Paramètres → Appareils et services → Vigicrues).
+title: Cours d'eau
+path: vigicrues
+icon: mdi:waves-arrow-up
+cards:
+  - type: markdown
+    title: Niveaux des stations
+    content: |-
+      {%- set hauteurs = integration_entities('vigicrues_hubeau')
+          | select('match', 'sensor[.].*_hauteur$') | list -%}
+      {%- if hauteurs | count == 0 -%}
+      Aucune station suivie : ajoutez-en dans les options de l'intégration.
+      {%- else -%}
+      | Station | Cours d'eau | Hauteur | Débit | Mesure |
+      |:--|:--|--:|--:|:--|
+      {% for h in hauteurs | sort(attribute='entity_id') -%}
+      {%- set d = h | replace('_hauteur', '_debit') -%}
+      {%- set date = state_attr(h, 'date_observation') -%}
+      | {{ device_attr(h, 'name') or state_attr(h, 'commune') or h }} | {{ state_attr(h, 'cours_eau') or '—' }} | {% if is_number(states(h)) %}**{{ states(h) | float | round(2) }} m**{% else %}—{% endif %} | {% if is_number(states(d)) %}{{ states(d) | float | round(1) }} m³/s{% else %}—{% endif %} | {% if date %}{{ relative_time(as_datetime(date)) }}{% else %}—{% endif %} |
+      {% endfor %}
+      {%- endif %}
+
+  - type: markdown
+    title: Fraîcheur des mesures
+    content: |-
+      {%- set hauteurs = integration_entities('vigicrues_hubeau')
+          | select('match', 'sensor[.].*_hauteur$') | list -%}
+      {%- set anciennes = namespace(liste=[]) -%}
+      {%- for h in hauteurs -%}
+        {%- set date = state_attr(h, 'date_observation') -%}
+        {%- if date and (now() - as_datetime(date)).total_seconds() > 3 * 3600 -%}
+          {%- set anciennes.liste = anciennes.liste + [device_attr(h, 'name') or h] -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {%- if anciennes.liste | count == 0 -%}
+      <ha-icon icon="mdi:check-circle"></ha-icon> Toutes les stations ont une mesure de moins de 3 heures.
+      {%- else -%}
+      <ha-icon icon="mdi:clock-alert"></ha-icon> Pas de mesure récente (plus de 3 h) :
+      {{ anciennes.liste | join(', ') }}.
+      {%- endif %}
+
+  # À adapter : capteurs de vos stations.
+  - type: history-graph
+    title: Hauteur (48 h)
+    hours_to_show: 48
+    entities:
+      - sensor.le_doubs_a_besancon_moulin_saint_paul_hauteur
+      - sensor.le_doubs_a_mouthe_hauteur
+
+  # À adapter : un marqueur par capteur de hauteur (seul à porter les coordonnées).
+  - type: map
+    title: Stations
+    entities:
+      - sensor.le_doubs_a_besancon_moulin_saint_paul_hauteur
+      - sensor.le_doubs_a_mouthe_hauteur
+
+  - type: markdown
+    content: |-
+      Données [Hub'Eau](https://hubeau.eaufrance.fr) / [Vigicrues](https://www.vigicrues.gouv.fr) (Service central d'hydrométéorologie et d'appui à la prévision des inondations).

@@ -16,7 +16,7 @@ RACINE = Path(__file__).resolve().parents[1]
 
 def version_manifest() -> str:
     return json.loads(
-        (RACINE / "custom_components/doubs_vigicrues/manifest.json").read_text(encoding="utf-8")
+        (RACINE / "custom_components/vigicrues_hubeau/manifest.json").read_text(encoding="utf-8")
     )["version"]
 
 
