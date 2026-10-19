@@ -32,15 +32,15 @@ BASE_URL = "https://hubeau.eaufrance.fr/api/v2/hydrometrie"
 TAILLE_RECHERCHE_MAX = 50
 
 
-class DoubsVigicruesError(Exception):
+class VigicruesError(Exception):
     """Erreur de base de l'intégration."""
 
 
-class DoubsVigicruesApiError(DoubsVigicruesError):
+class VigicruesApiError(VigicruesError):
     """L'API Hub'Eau est injoignable ou a renvoyé une réponse invalide."""
 
 
-class DoubsVigicruesStationError(DoubsVigicruesError):
+class VigicruesStationError(VigicruesError):
     """Une ou plusieurs stations demandées sont introuvables ou ambiguës."""
 
 
@@ -97,7 +97,7 @@ def _parse_observation(enregistrement: dict[str, Any], grandeur: str) -> Observa
         date_obs = datetime.fromisoformat(enregistrement["date_obs"])
     except (KeyError, ValueError) as erreur:
         msg = "Horodatage illisible dans la réponse Hub'Eau"
-        raise DoubsVigicruesApiError(msg) from erreur
+        raise VigicruesApiError(msg) from erreur
     if date_obs.tzinfo is None:
         date_obs = date_obs.replace(tzinfo=UTC)
     return Observation(
@@ -130,13 +130,13 @@ class HubeauClient:
                 return await response.json()
         except ClientResponseError as erreur:
             msg = f"Hub'Eau a répondu {erreur.status} pour {chemin}"
-            raise DoubsVigicruesApiError(msg) from erreur
+            raise VigicruesApiError(msg) from erreur
         except (ClientError, TimeoutError) as erreur:
             msg = f"Hub'Eau est injoignable ({chemin})"
-            raise DoubsVigicruesApiError(msg) from erreur
+            raise VigicruesApiError(msg) from erreur
         except ValueError as erreur:
             msg = f"Réponse illisible de Hub'Eau ({chemin})"
-            raise DoubsVigicruesApiError(msg) from erreur
+            raise VigicruesApiError(msg) from erreur
 
     async def async_get_stations(self, codes: list[str]) -> list[Station]:
         """Métadonnées de stations exactes ; erreur dédiée sinon.
@@ -160,15 +160,15 @@ class HubeauClient:
             code = enregistrement.get("code_station")
             if code not in codes:
                 msg = f"Codes ambigus : la réponse désigne {code} qui n'est pas un code exact demandé"
-                raise DoubsVigicruesStationError(msg)
+                raise VigicruesStationError(msg)
             if code in par_code:
                 msg = f"Le code {code} correspond à plusieurs stations : indiquez un code exact"
-                raise DoubsVigicruesStationError(msg)
+                raise VigicruesStationError(msg)
             par_code[code] = enregistrement
         manquants = sorted(set(codes) - set(par_code))
         if manquants:
             msg = f"Stations introuvables dans le référentiel Hub'Eau : {', '.join(manquants)}"
-            raise DoubsVigicruesStationError(msg)
+            raise VigicruesStationError(msg)
         return [_parse_station(par_code[code]) for code in codes]
 
     async def async_get_station(self, code: str) -> Station:

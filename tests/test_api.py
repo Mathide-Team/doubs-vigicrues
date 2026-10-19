@@ -9,10 +9,10 @@ import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
-from custom_components.doubs_vigicrues.api import (
-    DoubsVigicruesApiError,
-    DoubsVigicruesStationError,
+from custom_components.vigicrues_hubeau.api import (
     HubeauClient,
+    VigicruesApiError,
+    VigicruesStationError,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -108,7 +108,7 @@ async def test_station(client: TestClient) -> None:
 
 async def test_station_inconnue(client: TestClient) -> None:
     """Une station absente du référentiel lève une erreur dédiée."""
-    with pytest.raises(DoubsVigicruesStationError):
+    with pytest.raises(VigicruesStationError):
         await _hubeau(client).async_get_station("U259999003")
 
 
@@ -144,7 +144,7 @@ async def test_observation_sans_valeur(client: TestClient) -> None:
 
 async def test_motif_ambigu(client: TestClient) -> None:
     """Un motif de recherche ne configure pas la première station venue."""
-    with pytest.raises(DoubsVigicruesStationError):
+    with pytest.raises(VigicruesStationError):
         await _hubeau(client).async_get_station("U2599*")
 
 
@@ -193,21 +193,21 @@ async def test_valeur_negative(client: TestClient) -> None:
 
 
 async def test_erreur_http(client: TestClient) -> None:
-    """Une erreur HTTP devient DoubsVigicruesApiError."""
-    with pytest.raises(DoubsVigicruesApiError):
+    """Une erreur HTTP devient VigicruesApiError."""
+    with pytest.raises(VigicruesApiError):
         await _hubeau(client).async_get_station(STATION_PANNE)
 
 
 async def test_json_invalide(client: TestClient) -> None:
-    """Une réponse illisible devient DoubsVigicruesApiError."""
-    with pytest.raises(DoubsVigicruesApiError):
+    """Une réponse illisible devient VigicruesApiError."""
+    with pytest.raises(VigicruesApiError):
         await _hubeau(client).async_get_station(STATION_MAUVAIS_JSON)
 
 
 async def test_erreur_reseau(client: TestClient) -> None:
-    """Un serveur injoignable devient DoubsVigicruesApiError."""
+    """Un serveur injoignable devient VigicruesApiError."""
     hubeau = HubeauClient(client.session, base_url="http://127.0.0.1:1")
-    with pytest.raises(DoubsVigicruesApiError):
+    with pytest.raises(VigicruesApiError):
         await hubeau.async_get_station(STATION)
 
 
@@ -220,7 +220,7 @@ async def test_stations_multiples(client: TestClient) -> None:
 
 async def test_stations_manquante(client: TestClient) -> None:
     """Un code absent parmi les demandés refuse le lot entier."""
-    with pytest.raises(DoubsVigicruesStationError):
+    with pytest.raises(VigicruesStationError):
         await _hubeau(client).async_get_stations([STATION, "U259999003"])
 
 

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import DoubsVigicruesError, Observation, Station
+from .api import Observation, Station, VigicruesError
 from .const import GRANDEUR_DEBIT, GRANDEUR_HAUTEUR, LOGGER, UPDATE_INTERVAL_MIN
 
 if TYPE_CHECKING:
@@ -31,7 +31,7 @@ class StationData:
         self.debit = debit
 
 
-class DoubsVigicruesCoordinator(DataUpdateCoordinator[StationData]):
+class VigicruesCoordinator(DataUpdateCoordinator[StationData]):
     """Interroge Hub'Eau toutes les 15 minutes pour une station.
 
     Chaque station suivie possède son coordinateur : l'échec d'une
@@ -75,15 +75,15 @@ class DoubsVigicruesCoordinator(DataUpdateCoordinator[StationData]):
         """
         hauteur: Observation | None = None
         debit: Observation | None = None
-        erreur_hauteur: DoubsVigicruesError | None = None
-        erreur_debit: DoubsVigicruesError | None = None
+        erreur_hauteur: VigicruesError | None = None
+        erreur_debit: VigicruesError | None = None
         try:
             hauteur = await self._client.async_get_observation(self.code, GRANDEUR_HAUTEUR)
-        except DoubsVigicruesError as erreur:
+        except VigicruesError as erreur:
             erreur_hauteur = erreur
         try:
             debit = await self._client.async_get_observation(self.code, GRANDEUR_DEBIT)
-        except DoubsVigicruesError as erreur:
+        except VigicruesError as erreur:
             erreur_debit = erreur
         if erreur_hauteur is not None and erreur_debit is not None:
             msg = f"Mise à jour impossible : {erreur_hauteur}"

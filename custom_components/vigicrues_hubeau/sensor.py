@@ -16,26 +16,26 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .coordinator import DoubsVigicruesCoordinator, StationData
+from .coordinator import StationData, VigicruesCoordinator
 
 if TYPE_CHECKING:
-    from . import DoubsVigicruesConfigEntry
+    from . import VigicruesConfigEntry
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: DoubsVigicruesConfigEntry,
+    entry: VigicruesConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Crée les capteurs de chaque station suivie par l'entrée."""
-    coordinateurs: dict[str, DoubsVigicruesCoordinator] = entry.runtime_data
+    coordinateurs: dict[str, VigicruesCoordinator] = entry.runtime_data
     entites = []
     for coordinateur in coordinateurs.values():
         entites.append(
-            DoubsVigicruesHauteurSensor(coordinateur),
+            VigicruesHauteurSensor(coordinateur),
         )
         entites.append(
-            DoubsVigicruesDebitSensor(coordinateur),
+            VigicruesDebitSensor(coordinateur),
         )
     async_add_entities(entites)
     # La plateforme publie sa fonction d'ajout : les stations résolues
@@ -45,7 +45,7 @@ async def async_setup_entry(
 
 
 def _informations_station(
-    coordinateur: DoubsVigicruesCoordinator,
+    coordinateur: VigicruesCoordinator,
 ) -> DeviceInfo:
     """Appareil portant le nom réel de la station."""
     station = coordinateur.station
@@ -58,7 +58,7 @@ def _informations_station(
     )
 
 
-class DoubsVigicruesHauteurSensor(CoordinatorEntity[DoubsVigicruesCoordinator], SensorEntity):
+class VigicruesHauteurSensor(CoordinatorEntity[VigicruesCoordinator], SensorEntity):
     """Hauteur d'eau en mètres (échelle de la station)."""
 
     _attr_has_entity_name = True
@@ -67,7 +67,7 @@ class DoubsVigicruesHauteurSensor(CoordinatorEntity[DoubsVigicruesCoordinator], 
     _attr_native_unit_of_measurement = UnitOfLength.METERS
     _attr_state_class = SensorStateClass.MEASUREMENT
 
-    def __init__(self, coordinator: DoubsVigicruesCoordinator) -> None:
+    def __init__(self, coordinator: VigicruesCoordinator) -> None:
         super().__init__(coordinator)
         self._attr_unique_id = f"{coordinator.code}_hauteur"
         self._attr_device_info = _informations_station(coordinator)
@@ -108,7 +108,7 @@ class DoubsVigicruesHauteurSensor(CoordinatorEntity[DoubsVigicruesCoordinator], 
         return attributs
 
 
-class DoubsVigicruesDebitSensor(CoordinatorEntity[DoubsVigicruesCoordinator], SensorEntity):
+class VigicruesDebitSensor(CoordinatorEntity[VigicruesCoordinator], SensorEntity):
     """Débit en m³/s ; indisponible si la station ne mesure pas le débit."""
 
     _attr_has_entity_name = True
@@ -116,7 +116,7 @@ class DoubsVigicruesDebitSensor(CoordinatorEntity[DoubsVigicruesCoordinator], Se
     _attr_native_unit_of_measurement = UnitOfVolumeFlowRate.CUBIC_METERS_PER_SECOND
     _attr_state_class = SensorStateClass.MEASUREMENT
 
-    def __init__(self, coordinator: DoubsVigicruesCoordinator) -> None:
+    def __init__(self, coordinator: VigicruesCoordinator) -> None:
         super().__init__(coordinator)
         self._attr_unique_id = f"{coordinator.code}_debit"
         self._attr_device_info = _informations_station(coordinator)

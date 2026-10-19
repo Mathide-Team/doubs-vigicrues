@@ -1,8 +1,13 @@
-# Niveau du Doubs (Vigicrues)
+# Vigicrues (niveaux des cours d'eau)
 
-Intégration Home Assistant pour suivre la **hauteur** et le **débit** du
-Doubs (ou de n'importe quelle station hydrométrique Vigicrues), par défaut
-la station **Le Doubs à Besançon - Moulin Saint-Paul**.
+Intégration Home Assistant pour suivre la **hauteur** et le **débit** de
+**n'importe quelle station hydrométrique Vigicrues en France**, une ou
+plusieurs par entrée, avec recherche par cours d'eau ou par commune. La
+station **Le Doubs à Besançon - Moulin Saint-Paul** est seulement la
+suggestion initiale du formulaire.
+
+> Anciennement « Niveau du Doubs (Vigicrues) » (`doubs_vigicrues`,
+> dépôt `doubs-vigicrues`) : voir [Migration depuis doubs-vigicrues](#migration-depuis-doubs-vigicrues).
 
 Les données proviennent de l'API publique
 [Hub'Eau](https://hubeau.eaufrance.fr/page/api-hydrometrie) (plateforme
@@ -28,7 +33,7 @@ clé ni compte n'est nécessaire.
   à la configuration). La valeur 0 ou négative est conservée telle quelle :
   c'est une mesure, pas un défaut.
 - La hauteur est l'échelle limnimétrique de la station (référence locale),
-  pas la profondeur du Doubs.
+  pas la profondeur du cours d'eau.
 
 ## Installation
 
@@ -36,17 +41,17 @@ clé ni compte n'est nécessaire.
 
 1. Ajoutez ce dépôt dans HACS (« Dépôts personnalisés », catégorie
    « Intégration »).
-2. Recherchez « Niveau du Doubs (Vigicrues) » et installez-la.
+2. Recherchez « Vigicrues (niveaux des cours d'eau) » et installez-la.
 3. Redémarrez Home Assistant.
 
 ### Manuel
 
-Copiez le dossier `custom_components/doubs_vigicrues` dans le dossier
+Copiez le dossier `custom_components/vigicrues_hubeau` dans le dossier
 `custom_components` de votre installation, puis redémarrez Home Assistant.
 
 ## Configuration
 
-1. Ajoutez l'intégration « Niveau du Doubs (Vigicrues) ».
+1. Ajoutez l'intégration « Vigicrues (niveaux des cours d'eau) ».
 2. Renseignez un ou plusieurs codes de stations (prérempli avec
    `U251201001`, Le Doubs à Besançon - Moulin Saint-Paul), séparés par
    des virgules ou des espaces — ou cochez « Chercher » pour trouver
@@ -95,6 +100,23 @@ Paramètres → Tableaux de bord → ouvrir un tableau de bord → ⋮ → Modif
 → ⋮ → Éditeur de configuration, puis coller le contenu du fichier comme
 nouvel élément de `views:`.
 
+## Migration depuis doubs-vigicrues
+
+La version 0.3.0 renomme l'intégration (domaine `vigicrues_hubeau`) : Home
+Assistant la voit comme une **nouvelle intégration**.
+
+1. Supprimez l'entrée « Niveau du Doubs (Vigicrues) » (Paramètres →
+   Appareils et services) et, avec HACS, le dépôt `doubs-vigicrues`.
+2. Ajoutez le dépôt `Mathilde-Team/vigicrues` dans HACS, installez
+   « Vigicrues (niveaux des cours d'eau) » et redémarrez.
+3. Ajoutez l'intégration avec les mêmes codes de station. Les entités
+   gardent les mêmes noms (`sensor.<station>_hauteur`, `…_debit`) ;
+   l'historique des anciennes entités n'est pas repris.
+
+Le domaine n'est pas `vigicrues` pour ne pas entrer en conflit avec
+l'intégration HACS [julcollas/hass-vigicrues](https://github.com/julcollas/hass-vigicrues),
+qui l'utilise déjà : les deux peuvent être installées ensemble.
+
 ## Sources
 
 - API utilisée : [Hub'Eau Hydrométrie v2](https://hubeau.eaufrance.fr/page/api-hydrometrie)
@@ -105,7 +127,7 @@ nouvel élément de `views:`.
 
 ## Développement
 
-Socle qualité Mathide-Team : CI (ruff, yamllint, pytest, hassfest, HACS),
+Socle qualité Mathilde-Team : CI (ruff, yamllint, pytest, hassfest, HACS),
 branches protégées `dev` → `main`.
 
 ```bash
