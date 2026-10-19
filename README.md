@@ -77,6 +77,24 @@ entities:
 Un seul marqueur par station : le capteur de débit ne porte pas les
 coordonnées.
 
+## Tableau de bord
+
+Une vue prête à l'emploi est fournie dans
+[`exemples/tableau-de-bord.yaml`](exemples/tableau-de-bord.yaml) :
+
+- **niveaux des stations** : tableau station, cours d'eau, hauteur, débit
+  et ancienneté de la mesure, pour toutes les stations suivies (rien à
+  adapter) ;
+- **fraîcheur des mesures** : signale les stations sans mesure depuis
+  plus de 3 heures ;
+- **courbe des hauteurs sur 48 h** et **carte des stations** : remplacer
+  les capteurs d'exemple par les vôtres.
+
+Seules des cartes intégrées à Home Assistant sont utilisées. Installation :
+Paramètres → Tableaux de bord → ouvrir un tableau de bord → ⋮ → Modifier
+→ ⋮ → Éditeur de configuration, puis coller le contenu du fichier comme
+nouvel élément de `views:`.
+
 ## Sources
 
 - API utilisée : [Hub'Eau Hydrométrie v2](https://hubeau.eaufrance.fr/page/api-hydrometrie)
