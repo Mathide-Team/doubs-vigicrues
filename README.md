@@ -107,7 +107,7 @@ Assistant la voit comme une **nouvelle intégration**.
 
 1. Supprimez l'entrée « Niveau du Doubs (Vigicrues) » (Paramètres →
    Appareils et services) et, avec HACS, le dépôt `doubs-vigicrues`.
-2. Ajoutez le dépôt `Mathilde-Team/vigicrues` dans HACS, installez
+2. Ajoutez le dépôt `Mathilde-Team/Vigicrues` dans HACS, installez
    « Vigicrues (niveaux des cours d'eau) » et redémarrez.
 3. Ajoutez l'intégration avec les mêmes codes de station. Les entités
    gardent les mêmes noms (`sensor.<station>_hauteur`, `…_debit`) ;

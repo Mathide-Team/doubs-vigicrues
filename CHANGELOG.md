@@ -3,7 +3,7 @@
 ## [0.3.0] — 19/10/2026
 
 - **Renommage** : l'intégration s'appelle « Vigicrues (niveaux des cours
-  d'eau) », domaine `vigicrues_hubeau`, dépôt `Mathilde-Team/vigicrues`
+  d'eau) », domaine `vigicrues_hubeau`, dépôt `Mathilde-Team/Vigicrues`
   (#10). Toute station hydrométrique Vigicrues de France peut être suivie.
   **Changement incompatible** : supprimer l'ancienne entrée
   `doubs_vigicrues` et ajouter la nouvelle intégration (voir « Migration

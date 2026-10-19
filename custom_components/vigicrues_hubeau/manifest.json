@@ -5,10 +5,10 @@
     "@MathildeDec"
   ],
   "config_flow": true,
-  "documentation": "https://github.com/Mathilde-Team/vigicrues",
+  "documentation": "https://github.com/Mathilde-Team/Vigicrues",
   "integration_type": "hub",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/Mathilde-Team/vigicrues/issues",
+  "issue_tracker": "https://github.com/Mathilde-Team/Vigicrues/issues",
   "requirements": [],
   "version": "0.3.0"
 }
