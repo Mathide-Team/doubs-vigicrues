@@ -1,6 +1,6 @@
 # Journal des versions
 
-## 0.2.0 — 18/10/2026
+## [0.2.0] — 18/10/2026
 
 - Une entrée suit désormais **plusieurs stations** : codes séparés par
   des virgules ou des espaces à la configuration, ajout et retrait dans
@@ -15,7 +15,7 @@
   autres indisponibles, et une station disparue du référentiel est
   ignorée sans bloquer l'entrée.
 
-## 0.1.0 — 18/10/2026
+## [0.1.0] — 18/10/2026
 
 - Version initiale : hauteur d'eau (m) et débit (m³/s) d'une station
   hydrométrique Vigicrues, par défaut le Doubs à Besançon - Moulin
