@@ -1,4 +1,5 @@
-> **Dépôt archivé le 20/10/2026** — cette intégration n'est plus maintenue.
+> **Développement arrêté le 20/10/2026** — cette intégration n'est plus développée.
+> Les sources restent disponibles (dépôt conservé, pas d'archivage).
 > Remplacée par [benlepa0/hubeau-ha](https://github.com/benlepa0/hubeau-ha) (recommandée : percentiles sur 30 ans de chronique) et [julcollas/hass-vigicrues](https://github.com/julcollas/hass-vigicrues).
 > Nos idées d'amélioration ont été proposées en amont : [hass-vigicrues#28](https://github.com/julcollas/hass-vigicrues/issues/28), [hubeau-ha#1](https://github.com/benlepa0/hubeau-ha/issues/1). Mémoire du projet : Mathilde-Team/integrations-archivees.
 
