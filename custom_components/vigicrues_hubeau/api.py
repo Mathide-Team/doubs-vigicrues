@@ -146,6 +146,7 @@ class HubeauClient:
             # Sous-classe de ClientResponseError : une réponse 200 qui n'est pas
             # du JSON est illisible, pas une erreur HTTP « 200 ».
             msg = f"Réponse illisible de Hub'Eau ({chemin})"
+            LOGGER.warning("Réponse illisible de Hub'Eau (%s)", chemin)
             raise VigicruesApiError(msg) from erreur
         except ClientResponseError as erreur:
             msg = f"Hub'Eau a répondu {erreur.status} pour {chemin}"
