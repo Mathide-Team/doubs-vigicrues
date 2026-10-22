@@ -1,5 +1,14 @@
 # Journal des versions
 
+## [0.3.1] — 22/10/2026
+
+- Réponses JSON invalides de Hub'Eau désormais journalisées.
+- Journal de debug complet (SOCLE §8) : entrée et sortie de chaque
+  fonction de l'intégration tracées ; scripts journalisés avec loguru.
+- Avis en tête du README : développement arrêté le 20/10/2026, sources
+  conservées.
+- Tests : couverture 99,4 % lignes et branches, seuil bloquant à 95 % (#22).
+
 ## [0.3.0] — 19/10/2026
 
 - **Renommage** : l'intégration s'appelle « Vigicrues (niveaux des cours
