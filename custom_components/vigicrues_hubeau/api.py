@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from aiohttp import ClientError, ClientResponseError, ClientSession
+from aiohttp import ClientError, ClientResponseError, ClientSession, ContentTypeError
 
 BASE_URL = "https://hubeau.eaufrance.fr/api/v2/hydrometrie"
 
@@ -128,6 +128,11 @@ class HubeauClient:
             async with self._session.get(url, params=params) as response:
                 response.raise_for_status()
                 return await response.json()
+        except ContentTypeError as erreur:
+            # Sous-classe de ClientResponseError : une réponse 200 qui n'est pas
+            # du JSON est illisible, pas une erreur HTTP « 200 ».
+            msg = f"Réponse illisible de Hub'Eau ({chemin})"
+            raise VigicruesApiError(msg) from erreur
         except ClientResponseError as erreur:
             msg = f"Hub'Eau a répondu {erreur.status} pour {chemin}"
             raise VigicruesApiError(msg) from erreur

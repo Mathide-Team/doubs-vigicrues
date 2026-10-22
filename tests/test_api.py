@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -199,8 +200,8 @@ async def test_erreur_http(client: TestClient) -> None:
 
 
 async def test_json_invalide(client: TestClient) -> None:
-    """Une réponse illisible devient VigicruesApiError."""
-    with pytest.raises(VigicruesApiError):
+    """Une réponse 200 qui n'est pas du JSON est « illisible », pas une erreur HTTP « 200 »."""
+    with pytest.raises(VigicruesApiError, match=r"^Réponse illisible de Hub'Eau \(referentiel/stations\)$"):
         await _hubeau(client).async_get_station(STATION_MAUVAIS_JSON)
 
 
@@ -232,3 +233,83 @@ async def test_recherche_stations(client: TestClient) -> None:
     assert len(stations) == 2
     stations = await _hubeau(client).async_rechercher_stations()
     assert stations == []
+
+
+async def _serveur(chemin: str, reponse: web.Response) -> TestClient:
+    """Serveur d'une seule route renvoyant toujours *reponse*."""
+
+    async def route(request: web.Request) -> web.Response:
+        return reponse
+
+    app = web.Application()
+    app.router.add_get(chemin, route)
+    serveur = TestClient(TestServer(app))
+    await serveur.start_server()
+    return serveur
+
+
+async def test_json_annonce_mais_corrompu() -> None:
+    """Corps annoncé JSON mais tronqué : « illisible » (ValueError), pas une erreur HTTP."""
+    serveur = await _serveur(
+        "/referentiel/stations", web.Response(text='{"data": [', content_type="application/json")
+    )
+    try:
+        hubeau = HubeauClient(serveur.session, base_url=str(serveur.make_url("/")))
+        with pytest.raises(VigicruesApiError, match=r"^Réponse illisible de Hub'Eau"):
+            await hubeau.async_get_station(STATION)
+    finally:
+        await serveur.close()
+
+
+def _observations(enregistrement: dict) -> web.Response:
+    return web.json_response({"count": 1, "data": [enregistrement]})
+
+
+@pytest.mark.parametrize(
+    "date_obs",
+    [pytest.param("hier vers midi", id="illisible"), pytest.param(None, id="absente")],
+)
+async def test_horodatage_illisible(date_obs: str | None) -> None:
+    """Une observation sans horodatage exploitable est une erreur, pas une mesure datée au hasard."""
+    enregistrement = {"code_station": STATION, "resultat_obs": 1234.0}
+    if date_obs is not None:
+        enregistrement["date_obs"] = date_obs
+    serveur = await _serveur("/observations_tr", _observations(enregistrement))
+    try:
+        hubeau = HubeauClient(serveur.session, base_url=str(serveur.make_url("/")))
+        with pytest.raises(VigicruesApiError, match="Horodatage illisible"):
+            await hubeau.async_get_observation(STATION, "H")
+    finally:
+        await serveur.close()
+
+
+async def test_horodatage_sans_fuseau_lu_en_utc() -> None:
+    """Un horodatage sans fuseau est interprété en UTC (convention Hub'Eau)."""
+    enregistrement = {"code_station": STATION, "resultat_obs": 1234.0, "date_obs": "2026-10-22T06:30:00"}
+    serveur = await _serveur("/observations_tr", _observations(enregistrement))
+    try:
+        hubeau = HubeauClient(serveur.session, base_url=str(serveur.make_url("/")))
+        observation = await hubeau.async_get_observation(STATION, "H")
+    finally:
+        await serveur.close()
+    assert observation is not None
+    assert observation.date_obs == datetime(2026, 10, 22, 6, 30, tzinfo=UTC)
+
+
+async def test_stations_liste_vide(client: TestClient) -> None:
+    """Aucune station demandée : aucune requête utile, liste vide."""
+    assert await _hubeau(client).async_get_stations([]) == []
+
+
+async def test_station_en_double_dans_la_reponse() -> None:
+    """Deux enregistrements pour un même code : refusé plutôt que d'en prendre un au hasard."""
+    enregistrement = json.loads(_lire("station_referentiel.json"))["data"][0]
+    serveur = await _serveur(
+        "/referentiel/stations", web.json_response({"count": 2, "data": [enregistrement, enregistrement]})
+    )
+    try:
+        hubeau = HubeauClient(serveur.session, base_url=str(serveur.make_url("/")))
+        with pytest.raises(VigicruesStationError, match="correspond à plusieurs stations"):
+            await hubeau.async_get_station(STATION)
+    finally:
+        await serveur.close()
