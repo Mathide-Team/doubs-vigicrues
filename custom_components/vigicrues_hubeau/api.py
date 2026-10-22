@@ -104,8 +104,8 @@ def _parse_observation(enregistrement: dict[str, Any], grandeur: str) -> Observa
     try:
         date_obs = datetime.fromisoformat(enregistrement["date_obs"])
     except (KeyError, ValueError) as erreur:
-        LOGGER.debug("horodatage illisible dans la réponse Hub'Eau : %s", erreur)
         msg = "Horodatage illisible dans la réponse Hub'Eau"
+        LOGGER.debug("horodatage illisible dans la réponse Hub'Eau : %s", erreur)
         raise VigicruesApiError(msg) from erreur
     if date_obs.tzinfo is None:
         date_obs = date_obs.replace(tzinfo=UTC)
@@ -143,16 +143,16 @@ class HubeauClient:
                 LOGGER.debug("_async_get_json() retourne la réponse (%s)", chemin)
                 return await response.json()
         except ClientResponseError as erreur:
-            LOGGER.debug("Hub'Eau a répondu %s pour %s", erreur.status, chemin)
             msg = f"Hub'Eau a répondu {erreur.status} pour {chemin}"
+            LOGGER.debug("Hub'Eau a répondu %s pour %s", erreur.status, chemin)
             raise VigicruesApiError(msg) from erreur
         except (ClientError, TimeoutError) as erreur:
-            LOGGER.debug("Hub'Eau injoignable (%s) : %s", chemin, erreur)
             msg = f"Hub'Eau est injoignable ({chemin})"
+            LOGGER.debug("Hub'Eau injoignable (%s) : %s", chemin, erreur)
             raise VigicruesApiError(msg) from erreur
         except ValueError as erreur:
-            LOGGER.debug("réponse illisible de Hub'Eau (%s) : %s", chemin, erreur)
             msg = f"Réponse illisible de Hub'Eau ({chemin})"
+            LOGGER.debug("réponse illisible de Hub'Eau (%s) : %s", chemin, erreur)
             raise VigicruesApiError(msg) from erreur
 
     async def async_get_stations(self, codes: list[str]) -> list[Station]:
@@ -178,18 +178,18 @@ class HubeauClient:
         for enregistrement in enregistrements:
             code = enregistrement.get("code_station")
             if code not in codes:
-                LOGGER.debug("code ambigu refusé : %s", code)
                 msg = f"Codes ambigus : la réponse désigne {code} qui n'est pas un code exact demandé"
+                LOGGER.debug("code ambigu refusé : %s", code)
                 raise VigicruesStationError(msg)
             if code in par_code:
-                LOGGER.debug("code %s ambigu (plusieurs stations)", code)
                 msg = f"Le code {code} correspond à plusieurs stations : indiquez un code exact"
+                LOGGER.debug("code %s ambigu (plusieurs stations)", code)
                 raise VigicruesStationError(msg)
             par_code[code] = enregistrement
         manquants = sorted(set(codes) - set(par_code))
         if manquants:
-            LOGGER.debug("stations introuvables : %s", ", ".join(manquants))
             msg = f"Stations introuvables dans le référentiel Hub'Eau : {', '.join(manquants)}"
+            LOGGER.debug("stations introuvables : %s", ", ".join(manquants))
             raise VigicruesStationError(msg)
         LOGGER.debug("async_get_stations() retourne %s station(s)", len(codes))
         return [_parse_station(par_code[code]) for code in codes]

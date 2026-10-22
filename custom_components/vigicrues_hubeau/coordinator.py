@@ -93,8 +93,8 @@ class VigicruesCoordinator(DataUpdateCoordinator[StationData]):
             LOGGER.debug("débit indisponible (%s) : %s", self.code, erreur)
             erreur_debit = erreur
         if erreur_hauteur is not None and erreur_debit is not None:
-            LOGGER.debug("mise à jour impossible, les deux grandeurs échouent (%s)", self.code)
             msg = f"Mise à jour impossible : {erreur_hauteur}"
+            LOGGER.debug("mise à jour impossible, les deux grandeurs échouent (%s)", self.code)
             raise UpdateFailed(msg) from erreur_hauteur
         if erreur_hauteur is not None:
             LOGGER.warning("Hauteur indisponible pour %s : %s", self.code, erreur_hauteur)

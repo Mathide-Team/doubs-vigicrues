@@ -207,8 +207,8 @@ async def _creer_coordinateur(
     coordinateur = VigicruesCoordinator(hass, entry, client, station)
     try:
         await coordinateur.async_config_entry_first_refresh()
-    except ConfigEntryNotReady:
-        LOGGER.debug("première mise à jour impossible pour %s", station.code)
+    except ConfigEntryNotReady as erreur:
+        LOGGER.debug("première mise à jour impossible pour %s : %s", station.code, erreur)
         LOGGER.warning("Première mise à jour impossible pour %s", station.code)
     coordinateurs[station.code] = coordinateur
     LOGGER.debug("_creer_coordinateur() retourne le coordinateur")
