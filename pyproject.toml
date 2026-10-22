@@ -1,6 +1,6 @@
 [project]
 name = "vigicrues"
-version = "0.1.0"
+version = "0.3.1"
 description = "Niveaux et débits des cours d'eau (Vigicrues/Hub'Eau) pour Home Assistant"
 requires-python = ">=3.13.2,<3.14"
 license = "MIT"
