@@ -20,6 +20,7 @@ STATION = "U259999001"
 STATION_2 = "U259999002"
 STATION_INCONNUE = "U259999003"
 STATION_PANNE = "U500000500"
+COURS_EAU_PANNE = "La Panne"
 
 
 def _lire(nom: str) -> str:
@@ -44,6 +45,9 @@ def _build_app() -> web.Application:
             return web.Response(status=500)
         cours_eau = request.query.get("libelle_cours_eau", "")
         commune = request.query.get("code_commune_station", "")
+        if cours_eau == COURS_EAU_PANNE:
+            # Recherche en panne côté Hub'Eau.
+            return web.Response(status=500)
         if cours_eau or commune:
             # Recherche : les stations de test, filtrées par critère.
             connues = [STATION, STATION_2]
@@ -385,3 +389,140 @@ async def test_deja_suivie_entree_v1(hass: HomeAssistant, api_locale: TestClient
     )
     assert resultat["type"] is FlowResultType.FORM
     assert resultat["errors"] == {"base": "deja_suivie"}
+
+
+async def _vers_recherche(hass: HomeAssistant) -> dict:
+    """Ouvre le flux de configuration jusqu'à l'étape de recherche."""
+    resultat = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    return await hass.config_entries.flow.async_configure(
+        resultat["flow_id"], {"stations": "", "chercher": True}
+    )
+
+
+async def test_recherche_api_indisponible(hass: HomeAssistant, api_locale: TestClient) -> None:
+    """Recherche en panne côté Hub'Eau : erreur de connexion, le formulaire reste."""
+    resultat = await _vers_recherche(hass)
+    resultat = await hass.config_entries.flow.async_configure(
+        resultat["flow_id"], {"cours_eau": COURS_EAU_PANNE, "code_commune": ""}
+    )
+    assert resultat["type"] is FlowResultType.FORM
+    assert resultat["step_id"] == "recherche"
+    assert resultat["errors"] == {"base": "cannot_connect"}
+
+
+async def test_resultats_selection_vide(hass: HomeAssistant, api_locale: TestClient) -> None:
+    """Valider les résultats sans rien cocher est refusé (aucune entrée créée)."""
+    resultat = await _vers_recherche(hass)
+    resultat = await hass.config_entries.flow.async_configure(
+        resultat["flow_id"], {"cours_eau": "Le Douby", "code_commune": ""}
+    )
+    resultat = await hass.config_entries.flow.async_configure(resultat["flow_id"], {"stations": []})
+    assert resultat["type"] is FlowResultType.FORM
+    assert resultat["step_id"] == "resultats"
+    assert resultat["errors"] == {"stations": "codes_vides"}
+    assert hass.config_entries.async_entries(DOMAIN) == []
+
+
+async def test_resultats_station_deja_suivie(hass: HomeAssistant, api_locale: TestClient) -> None:
+    """Choisir dans les résultats une station déjà suivie par une autre entrée est refusé."""
+    MockConfigEntry(domain=DOMAIN, data={"stations": [STATION]}, unique_id=STATION).add_to_hass(hass)
+    resultat = await _vers_recherche(hass)
+    resultat = await hass.config_entries.flow.async_configure(
+        resultat["flow_id"], {"cours_eau": "Le Douby", "code_commune": ""}
+    )
+    resultat = await hass.config_entries.flow.async_configure(
+        resultat["flow_id"], {"stations": [STATION, STATION_2]}
+    )
+    assert resultat["type"] is FlowResultType.FORM
+    assert resultat["errors"] == {"base": "deja_suivie"}
+    assert len(hass.config_entries.async_entries(DOMAIN)) == 1
+
+
+async def _options_vers_ajout(hass: HomeAssistant) -> tuple[MockConfigEntry, dict]:
+    """Entrée suivant STATION, options ouvertes jusqu'à l'étape d'ajout."""
+    hass.config.language = "fr"
+    entry = MockConfigEntry(domain=DOMAIN, data={"stations": [STATION]}, unique_id=STATION)
+    entry.add_to_hass(hass)
+    resultat = await _options_init(hass, entry)
+    resultat = await hass.config_entries.options.async_configure(
+        resultat["flow_id"], {"stations": [STATION], "ajouter": True}
+    )
+    assert resultat["step_id"] == "ajout"
+    return entry, resultat
+
+
+@pytest.mark.parametrize(
+    ("saisie", "erreurs"),
+    [
+        pytest.param(" , ,  ", {"stations": "codes_vides"}, id="codes-vides"),
+        pytest.param(STATION_INCONNUE, {"stations": "station_inconnue"}, id="inconnue"),
+        pytest.param(STATION_PANNE, {"base": "cannot_connect"}, id="api-en-panne"),
+    ],
+)
+async def test_options_ajout_refuse(
+    hass: HomeAssistant, api_locale: TestClient, saisie: str, erreurs: dict
+) -> None:
+    """Ajout par code refusé : le formulaire d'ajout revient, l'entrée est inchangée."""
+    entry, resultat = await _options_vers_ajout(hass)
+    resultat = await hass.config_entries.options.async_configure(
+        resultat["flow_id"], {"stations": saisie, "chercher": False}
+    )
+    assert resultat["type"] is FlowResultType.FORM
+    assert resultat["step_id"] == "ajout"
+    assert resultat["errors"] == erreurs
+    assert entry.data == {"stations": [STATION]}
+
+
+@pytest.mark.parametrize(
+    ("criteres", "erreurs"),
+    [
+        pytest.param(
+            {"cours_eau": "", "code_commune": ""}, {"base": "au_moins_un_critere"}, id="sans-critere"
+        ),
+        pytest.param(
+            {"cours_eau": COURS_EAU_PANNE, "code_commune": ""}, {"base": "cannot_connect"}, id="panne"
+        ),
+        pytest.param({"cours_eau": "", "code_commune": "99999"}, {"base": "aucune_trouvee"}, id="aucune"),
+    ],
+)
+async def test_options_recherche_refusee(
+    hass: HomeAssistant, api_locale: TestClient, criteres: dict, erreurs: dict
+) -> None:
+    """Recherche d'ajout sans critère, en panne ou sans résultat : le formulaire revient."""
+    entry, resultat = await _options_vers_ajout(hass)
+    resultat = await hass.config_entries.options.async_configure(
+        resultat["flow_id"], {"stations": "", "chercher": True}
+    )
+    resultat = await hass.config_entries.options.async_configure(resultat["flow_id"], criteres)
+    assert resultat["type"] is FlowResultType.FORM
+    assert resultat["step_id"] == "recherche"
+    assert resultat["errors"] == erreurs
+    assert entry.data == {"stations": [STATION]}
+
+
+async def test_options_resultats_selection_vide(hass: HomeAssistant, api_locale: TestClient) -> None:
+    """Résultats d'ajout validés sans rien cocher : refusé, entrée inchangée."""
+    entry, resultat = await _options_vers_ajout(hass)
+    resultat = await hass.config_entries.options.async_configure(
+        resultat["flow_id"], {"stations": "", "chercher": True}
+    )
+    resultat = await hass.config_entries.options.async_configure(
+        resultat["flow_id"], {"cours_eau": "Le Douby", "code_commune": ""}
+    )
+    resultat = await hass.config_entries.options.async_configure(resultat["flow_id"], {"stations": []})
+    assert resultat["type"] is FlowResultType.FORM
+    assert resultat["step_id"] == "resultats"
+    assert resultat["errors"] == {"stations": "codes_vides"}
+    assert entry.data == {"stations": [STATION]}
+
+
+async def test_options_ajout_sans_doublon(hass: HomeAssistant, api_locale: TestClient) -> None:
+    """Ajouter une station déjà suivie (et la répéter) ne crée aucun doublon."""
+    entry, resultat = await _options_vers_ajout(hass)
+    resultat = await hass.config_entries.options.async_configure(
+        resultat["flow_id"], {"stations": f"{STATION_2} {STATION} {STATION_2}", "chercher": False}
+    )
+    await hass.async_block_till_done()
+    assert resultat["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.data == {"stations": [STATION, STATION_2]}
+    assert entry.unique_id == f"{STATION},{STATION_2}"
