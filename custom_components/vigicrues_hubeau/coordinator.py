@@ -26,9 +26,11 @@ class StationData:
         hauteur: Observation | None,
         debit: Observation | None,
     ) -> None:
+        LOGGER.debug("StationData.__init__() appelé | code=%s", station.code)
         self.station = station
         self.hauteur = hauteur
         self.debit = debit
+        LOGGER.debug("StationData.__init__() retourne")
 
 
 class VigicruesCoordinator(DataUpdateCoordinator[StationData]):
@@ -47,6 +49,7 @@ class VigicruesCoordinator(DataUpdateCoordinator[StationData]):
         client: HubeauClient,
         station: Station,
     ) -> None:
+        LOGGER.debug("VigicruesCoordinator.__init__() appelé | code=%s", station.code)
         super().__init__(
             hass,
             LOGGER,
@@ -56,6 +59,7 @@ class VigicruesCoordinator(DataUpdateCoordinator[StationData]):
         )
         self._client = client
         self.station = station
+        LOGGER.debug("VigicruesCoordinator.__init__() retourne")
 
     @property
     def code(self) -> str:
@@ -73,6 +77,7 @@ class VigicruesCoordinator(DataUpdateCoordinator[StationData]):
         disponible, avec un avertissement. L'échec des deux seules
         fait échouer la mise à jour de la station.
         """
+        LOGGER.debug("_async_update_data() appelé | code=%s", self.code)
         hauteur: Observation | None = None
         debit: Observation | None = None
         erreur_hauteur: VigicruesError | None = None
@@ -80,16 +85,20 @@ class VigicruesCoordinator(DataUpdateCoordinator[StationData]):
         try:
             hauteur = await self._client.async_get_observation(self.code, GRANDEUR_HAUTEUR)
         except VigicruesError as erreur:
+            LOGGER.debug("hauteur indisponible (%s) : %s", self.code, erreur)
             erreur_hauteur = erreur
         try:
             debit = await self._client.async_get_observation(self.code, GRANDEUR_DEBIT)
         except VigicruesError as erreur:
+            LOGGER.debug("débit indisponible (%s) : %s", self.code, erreur)
             erreur_debit = erreur
         if erreur_hauteur is not None and erreur_debit is not None:
             msg = f"Mise à jour impossible : {erreur_hauteur}"
+            LOGGER.debug("mise à jour impossible, les deux grandeurs échouent (%s)", self.code)
             raise UpdateFailed(msg) from erreur_hauteur
         if erreur_hauteur is not None:
             LOGGER.warning("Hauteur indisponible pour %s : %s", self.code, erreur_hauteur)
         if erreur_debit is not None:
             LOGGER.warning("Débit indisponible pour %s : %s", self.code, erreur_debit)
+        LOGGER.debug("_async_update_data() retourne les données (%s)", self.code)
         return StationData(station=self.station, hauteur=hauteur, debit=debit)

@@ -15,7 +15,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, LOGGER
 from .coordinator import StationData, VigicruesCoordinator
 
 if TYPE_CHECKING:
@@ -28,6 +28,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Crée les capteurs de chaque station suivie par l'entrée."""
+    LOGGER.debug("async_setup_entry() (capteurs) appelé")
     coordinateurs: dict[str, VigicruesCoordinator] = entry.runtime_data
     entites = []
     for coordinateur in coordinateurs.values():
@@ -38,17 +39,21 @@ async def async_setup_entry(
             VigicruesDebitSensor(coordinateur),
         )
     async_add_entities(entites)
+    LOGGER.debug("async_setup_entry() (capteurs) retourne | %s entité(s)", len(entites))
     # La plateforme publie sa fonction d'ajout : les stations résolues
     # plus tard (référentiel indisponible au démarrage) pourront créer
     # leurs capteurs sans recharger l'entrée.
     hass.data[DOMAIN][entry.entry_id]["ajouter_entites"] = async_add_entities
+    LOGGER.debug("async_setup_entry() (capteurs) a publié sa fonction d'ajout")
 
 
 def _informations_station(
     coordinateur: VigicruesCoordinator,
 ) -> DeviceInfo:
     """Appareil portant le nom réel de la station."""
+    LOGGER.debug("_informations_station() appelé | code=%s", coordinateur.station.code)
     station = coordinateur.station
+    LOGGER.debug("_informations_station() retourne les infos de l'appareil")
     return DeviceInfo(
         identifiers={(DOMAIN, station.code)},
         name=station.libelle,
@@ -68,15 +73,20 @@ class VigicruesHauteurSensor(CoordinatorEntity[VigicruesCoordinator], SensorEnti
     _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coordinator: VigicruesCoordinator) -> None:
+        LOGGER.debug("VigicruesHauteurSensor.__init__() appelé | code=%s", coordinator.code)
         super().__init__(coordinator)
         self._attr_unique_id = f"{coordinator.code}_hauteur"
         self._attr_device_info = _informations_station(coordinator)
+        LOGGER.debug("VigicruesHauteurSensor.__init__() retourne")
 
     @property
     def native_value(self) -> float | None:
         """Dernière hauteur, convertie de mm en m ; None si aucune mesure."""
+        LOGGER.debug("native_value() (hauteur) appelé")
         if self.coordinator.data is None or self.coordinator.data.hauteur is None:
+            LOGGER.debug("native_value() (hauteur) retourne None")
             return None
+        LOGGER.debug("native_value() (hauteur) retourne la mesure")
         return self.coordinator.data.hauteur.resultat / 1000
 
     @property
@@ -92,6 +102,7 @@ class VigicruesHauteurSensor(CoordinatorEntity[VigicruesCoordinator], SensorEnti
         pas sur le débit) : la carte « map » de Home Assistant affiche
         ainsi un marqueur unique par station.
         """
+        LOGGER.debug("extra_state_attributes() (hauteur) appelé")
         station = self.coordinator.station
         attributs: dict[str, object] = {
             "commune": station.commune,
@@ -105,6 +116,7 @@ class VigicruesHauteurSensor(CoordinatorEntity[VigicruesCoordinator], SensorEnti
         if data is not None and data.hauteur is not None:
             attributs["date_observation"] = data.hauteur.date_obs.isoformat()
             attributs["continuite"] = data.hauteur.continuite
+        LOGGER.debug("extra_state_attributes() (hauteur) retourne %s attribut(s)", len(attributs))
         return attributs
 
 
@@ -117,23 +129,31 @@ class VigicruesDebitSensor(CoordinatorEntity[VigicruesCoordinator], SensorEntity
     _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coordinator: VigicruesCoordinator) -> None:
+        LOGGER.debug("VigicruesDebitSensor.__init__() appelé | code=%s", coordinator.code)
         super().__init__(coordinator)
         self._attr_unique_id = f"{coordinator.code}_debit"
         self._attr_device_info = _informations_station(coordinator)
+        LOGGER.debug("VigicruesDebitSensor.__init__() retourne")
 
     @property
     def native_value(self) -> float | None:
         """Dernier débit, converti de l/s en m³/s ; None si aucune mesure."""
+        LOGGER.debug("native_value() (débit) appelé")
         if self.coordinator.data is None or self.coordinator.data.debit is None:
+            LOGGER.debug("native_value() (débit) retourne None")
             return None
+        LOGGER.debug("native_value() (débit) retourne la mesure")
         return self.coordinator.data.debit.resultat / 1000
 
     @property
     def extra_state_attributes(self) -> dict[str, object]:
         """Date et continuité de la dernière mesure de débit."""
+        LOGGER.debug("extra_state_attributes() (débit) appelé")
         data: StationData | None = self.coordinator.data
         if data is None or data.debit is None:
+            LOGGER.debug("extra_state_attributes() (débit) retourne un dictionnaire vide")
             return {}
+        LOGGER.debug("extra_state_attributes() (débit) retourne les attributs")
         return {
             "date_observation": data.debit.date_obs.isoformat(),
             "continuite": data.debit.continuite,

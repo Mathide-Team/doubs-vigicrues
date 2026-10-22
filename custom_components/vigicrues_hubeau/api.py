@@ -26,6 +26,8 @@ from typing import Any
 
 from aiohttp import ClientError, ClientResponseError, ClientSession
 
+from .const import LOGGER
+
 BASE_URL = "https://hubeau.eaufrance.fr/api/v2/hydrometrie"
 
 # Bornes raisonnables pour une recherche interactive.
@@ -91,15 +93,23 @@ def _parse_observation(enregistrement: dict[str, Any], grandeur: str) -> Observa
     enregistrement sans valeur (``resultat_obs`` nul) n'est pas une
     mesure : ``None`` est retourné.
     """
+    LOGGER.debug(
+        "_parse_observation() appelée | code=%s grandeur=%s",
+        enregistrement.get("code_station"),
+        grandeur,
+    )
     if enregistrement.get("resultat_obs") is None:
+        LOGGER.debug("_parse_observation() retourne None (aucune mesure)")
         return None
     try:
         date_obs = datetime.fromisoformat(enregistrement["date_obs"])
     except (KeyError, ValueError) as erreur:
         msg = "Horodatage illisible dans la réponse Hub'Eau"
+        LOGGER.debug("horodatage illisible dans la réponse Hub'Eau : %s", erreur)
         raise VigicruesApiError(msg) from erreur
     if date_obs.tzinfo is None:
         date_obs = date_obs.replace(tzinfo=UTC)
+    LOGGER.debug("_parse_observation() retourne une observation (%s)", grandeur)
     return Observation(
         code_station=enregistrement["code_station"],
         grandeur=grandeur,
@@ -117,25 +127,32 @@ class HubeauClient:
         session: ClientSession,
         base_url: str | None = None,
     ) -> None:
+        LOGGER.debug("HubeauClient.__init__() appelé | url=%s", base_url or BASE_URL)
         self._session = session
         # Lue à l'instanciation : les tests peuvent surcharger api.BASE_URL.
         self._base_url = (base_url or BASE_URL).rstrip("/")
+        LOGGER.debug("HubeauClient.__init__() retourne")
 
     async def _async_get_json(self, chemin: str, params: dict[str, Any]) -> Any:
         """GET protégé : réseau, HTTP et JSON validés."""
+        LOGGER.debug("_async_get_json() appelé | chemin=%s", chemin)
         url = f"{self._base_url}/{chemin}"
         try:
             async with self._session.get(url, params=params) as response:
                 response.raise_for_status()
+                LOGGER.debug("_async_get_json() retourne la réponse (%s)", chemin)
                 return await response.json()
         except ClientResponseError as erreur:
             msg = f"Hub'Eau a répondu {erreur.status} pour {chemin}"
+            LOGGER.debug("Hub'Eau a répondu %s pour %s", erreur.status, chemin)
             raise VigicruesApiError(msg) from erreur
         except (ClientError, TimeoutError) as erreur:
             msg = f"Hub'Eau est injoignable ({chemin})"
+            LOGGER.debug("Hub'Eau injoignable (%s) : %s", chemin, erreur)
             raise VigicruesApiError(msg) from erreur
         except ValueError as erreur:
             msg = f"Réponse illisible de Hub'Eau ({chemin})"
+            LOGGER.debug("réponse illisible de Hub'Eau (%s) : %s", chemin, erreur)
             raise VigicruesApiError(msg) from erreur
 
     async def async_get_stations(self, codes: list[str]) -> list[Station]:
@@ -146,7 +163,9 @@ class HubeauClient:
         un code absent ou ambigu (motif) est refusé plutôt que de
         prendre la première station trouvée.
         """
+        LOGGER.debug("async_get_stations() appelé | %s code(s)", len(codes))
         if not codes:
+            LOGGER.debug("async_get_stations() retourne [] (aucun code)")
             return []
         params: dict[str, Any] = {
             "code_station": codes,
@@ -160,15 +179,19 @@ class HubeauClient:
             code = enregistrement.get("code_station")
             if code not in codes:
                 msg = f"Codes ambigus : la réponse désigne {code} qui n'est pas un code exact demandé"
+                LOGGER.debug("code ambigu refusé : %s", code)
                 raise VigicruesStationError(msg)
             if code in par_code:
                 msg = f"Le code {code} correspond à plusieurs stations : indiquez un code exact"
+                LOGGER.debug("code %s ambigu (plusieurs stations)", code)
                 raise VigicruesStationError(msg)
             par_code[code] = enregistrement
         manquants = sorted(set(codes) - set(par_code))
         if manquants:
             msg = f"Stations introuvables dans le référentiel Hub'Eau : {', '.join(manquants)}"
+            LOGGER.debug("stations introuvables : %s", ", ".join(manquants))
             raise VigicruesStationError(msg)
+        LOGGER.debug("async_get_stations() retourne %s station(s)", len(codes))
         return [_parse_station(par_code[code]) for code in codes]
 
     async def async_get_station(self, code: str) -> Station:
@@ -181,6 +204,7 @@ class HubeauClient:
         code_commune: str | None = None,
     ) -> list[Station]:
         """Recherche des stations par cours d'eau (nom partiel) ou commune (code INSEE)."""
+        LOGGER.debug("async_rechercher_stations() appelé")
         params: dict[str, Any] = {
             "format": "json",
             "size": str(TAILLE_RECHERCHE_MAX),
@@ -190,7 +214,9 @@ class HubeauClient:
         if code_commune:
             params["code_commune_station"] = code_commune
         donnees = await self._async_get_json("referentiel/stations", params)
-        return [_parse_station(e) for e in donnees.get("data") or []]
+        stations = [_parse_station(e) for e in donnees.get("data") or []]
+        LOGGER.debug("async_rechercher_stations() retourne %s station(s)", len(stations))
+        return stations
 
     async def async_get_observation(self, code: str, grandeur: str) -> Observation | None:
         """Dernière observation d'une grandeur, ou None si aucune mesure.
@@ -199,6 +225,7 @@ class HubeauClient:
         première réponse est la plus récente. Une absence de mesure
         n'est pas une erreur.
         """
+        LOGGER.debug("async_get_observation() appelé | code=%s grandeur=%s", code, grandeur)
         donnees = await self._async_get_json(
             "observations_tr",
             {
@@ -211,5 +238,7 @@ class HubeauClient:
         )
         enregistrements = donnees.get("data") or []
         if not enregistrements:
+            LOGGER.debug("async_get_observation() retourne None (aucune mesure)")
             return None
+        LOGGER.debug("async_get_observation() retourne la dernière mesure")
         return _parse_observation(enregistrements[0], grandeur)
