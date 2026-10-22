@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -37,6 +40,10 @@ def _enregistrement_station(code: str) -> dict:
     enregistrement["code_station"] = code
     if code not in (STATION, STATION_SANS_DEBIT):
         enregistrement["libelle_station"] = f"{enregistrement['libelle_station']} [{code}]"
+    if code == "SANSGPS":
+        # Station du référentiel sans coordonnées publiées.
+        enregistrement["latitude_station"] = None
+        del enregistrement["longitude_station"]
     return enregistrement
 
 
@@ -44,6 +51,7 @@ def _build_app(
     panne_station: dict | None = None,
     panne_referentiel: dict | None = None,
     blocage_referentiel: dict | None = None,
+    blocage_observations: dict | None = None,
 ) -> web.Application:
     """Serveur factice reproduisant les routes Hub'Eau.
 
@@ -51,7 +59,8 @@ def _build_app(
     échouer toutes les requêtes d'observations de cette station tant que
     ``actif`` est vrai : le test peut y mettre fin pour la récupération.
     ``blocage_referentiel`` suspend la réponse du référentiel pour un
-    code jusqu'à libération (test de concurrence).
+    code jusqu'à libération (test de concurrence) ; ``blocage_observations``
+    fait de même pour les observations d'une station.
     """
 
     async def referentiel(request: web.Request) -> web.Response:
@@ -78,6 +87,10 @@ def _build_app(
     async def observations(request: web.Request) -> web.Response:
         code = request.query.get("code_entite", "")
         grandeur = request.query.get("grandeur_hydro", "")
+        if blocage_observations and blocage_observations["actif"] and blocage_observations["code"] == code:
+            blocage_observations["atteint"].set()
+            await blocage_observations["evenement"].wait()
+            blocage_observations["actif"] = False
         if code == "PANNEQ" and grandeur == "Q":
             return web.Response(status=500)
         if code == "PANNEH2":
@@ -692,3 +705,231 @@ async def test_station_en_attente_temporisation(hass: HomeAssistant, client: Tes
             assert float(_etat(hass, "moulin_de_test_hauteur").state) == 1.234
     finally:
         await serveur.close()
+
+
+def _blocage(code: str) -> dict:
+    """Blocage inactif d'une réponse, à activer juste avant le réessai visé."""
+    return {"code": code, "actif": False, "evenement": asyncio.Event(), "atteint": asyncio.Event()}
+
+
+async def _installer_avec_attente(hass: HomeAssistant, serveur: TestClient) -> MockConfigEntry:
+    """Entrée STATION + PANNEREF : PANNEREF part en attente (référentiel en panne)."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"stations": [STATION, "PANNEREF"]},
+        unique_id=f"PANNEREF,{STATION}",
+        version=2,
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert hass.data[DOMAIN][entry.entry_id]["en_attente"] == ["PANNEREF"]
+    return entry
+
+
+@pytest.fixture
+async def serveur_attente(monkeypatch: pytest.MonkeyPatch):
+    """Serveur dont le référentiel de PANNEREF est en panne, blocages prêts."""
+    etat = {
+        "panne": {"code": "PANNEREF", "actif": True},
+        "blocage_ref": _blocage("PANNEREF"),
+        "blocage_obs": _blocage("PANNEREF"),
+    }
+    serveur = TestClient(
+        TestServer(
+            _build_app(
+                panne_referentiel=etat["panne"],
+                blocage_referentiel=etat["blocage_ref"],
+                blocage_observations=etat["blocage_obs"],
+            )
+        )
+    )
+    await serveur.start_server()
+    monkeypatch.setattr("custom_components.vigicrues_hubeau.api.BASE_URL", str(serveur.make_url("/")))
+    etat["serveur"] = serveur
+    yield etat
+    await serveur.close()
+
+
+async def test_migration_version_future_refusee(hass: HomeAssistant, client: TestClient) -> None:
+    """Une entrée d'une version future (retour arrière) n'est pas migrée à l'aveugle."""
+    entry = MockConfigEntry(domain=DOMAIN, data={"stations": [STATION]}, unique_id=STATION, version=3)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id) is False
+    assert entry.state is ConfigEntryState.MIGRATION_ERROR
+    assert entry.data == {"stations": [STATION]}
+
+
+async def test_migration_v1_sans_station_refusee(hass: HomeAssistant, client: TestClient) -> None:
+    """Une entrée v1 corrompue (sans station) échoue à la migration au lieu de charger vide."""
+    entry = MockConfigEntry(domain=DOMAIN, data={}, unique_id="vide", version=1)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id) is False
+    assert entry.state is ConfigEntryState.MIGRATION_ERROR
+    assert entry.version == 1
+
+
+async def test_migration_version_courante_inchangee(hass: HomeAssistant) -> None:
+    """Migrer une entrée déjà à la version courante ne modifie rien (idempotent)."""
+    from custom_components.vigicrues_hubeau import async_migrate_entry
+
+    entry = MockConfigEntry(domain=DOMAIN, data={"stations": [STATION]}, unique_id=STATION, version=2)
+    entry.add_to_hass(hass)
+    assert await async_migrate_entry(hass, entry) is True
+    assert entry.version == 2
+    assert entry.data == {"stations": [STATION]}
+
+
+async def test_reessai_apres_dechargement_sans_effet(hass: HomeAssistant, serveur_attente: dict) -> None:
+    """Un réessai déclenché après le déchargement de l'entrée ne recrée rien."""
+    hass.config.language = "fr"
+    entry = await _installer_avec_attente(hass, serveur_attente["serveur"])
+    donnees = hass.data[DOMAIN][entry.entry_id]
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+    serveur_attente["panne"]["actif"] = False
+    await donnees["retenter"]()
+    await hass.async_block_till_done()
+    assert donnees["en_attente"] == ["PANNEREF"]
+    assert "PANNEREF" not in donnees["coordinateurs"]
+
+
+async def test_reessai_station_retiree_avant_tentative(hass: HomeAssistant, serveur_attente: dict) -> None:
+    """Station en attente retirée des données avant le réessai : elle n'est pas reprise."""
+    hass.config.language = "fr"
+    entry = await _installer_avec_attente(hass, serveur_attente["serveur"])
+    donnees = hass.data[DOMAIN][entry.entry_id]
+    serveur_attente["panne"]["actif"] = False
+    # Données modifiées sans laisser le rechargement s'exécuter : le réessai
+    # part juste après le changement, avant le rechargement planifié.
+    with patch.object(hass.config_entries, "async_reload", AsyncMock(return_value=True)):
+        hass.config_entries.async_update_entry(entry, data={"stations": [STATION]})
+        await donnees["retenter"]()
+    assert donnees["en_attente"] == []
+    assert _etat(hass, "moulin_de_test_panneref_hauteur") is None
+    assert float(_etat(hass, "moulin_de_test_hauteur").state) == 1.234
+
+
+async def test_reessai_en_echec_replanifie(hass: HomeAssistant, serveur_attente: dict) -> None:
+    """Un réessai encore en échec garde la station en attente et replanifie la tentative."""
+    from datetime import timedelta
+
+    from homeassistant.util import dt as dt_util
+    from pytest_homeassistant_custom_component.common import async_fire_time_changed
+
+    hass.config.language = "fr"
+    entry = await _installer_avec_attente(hass, serveur_attente["serveur"])
+    donnees = hass.data[DOMAIN][entry.entry_id]
+    await donnees["retenter"]()  # référentiel toujours en panne
+    await hass.async_block_till_done()
+    assert donnees["en_attente"] == ["PANNEREF"]
+    assert _etat(hass, "moulin_de_test_panneref_hauteur") is None
+    # La tentative a été replanifiée : l'horloge suffit à reprendre la station.
+    serveur_attente["panne"]["actif"] = False
+    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=61))
+    await hass.async_block_till_done()
+    assert donnees["en_attente"] == []
+    assert float(_etat(hass, "moulin_de_test_panneref_hauteur").state) == 1.234
+
+
+async def test_reessai_station_retiree_pendant_referentiel(
+    hass: HomeAssistant, serveur_attente: dict
+) -> None:
+    """Station retirée pendant l'attente du référentiel (rechargement pas encore exécuté)."""
+    hass.config.language = "fr"
+    entry = await _installer_avec_attente(hass, serveur_attente["serveur"])
+    donnees = hass.data[DOMAIN][entry.entry_id]
+    serveur_attente["panne"]["actif"] = False
+    serveur_attente["blocage_ref"]["actif"] = True
+    with patch.object(hass.config_entries, "async_reload", AsyncMock(return_value=True)):
+        tache = asyncio.create_task(donnees["retenter"]())
+        await asyncio.wait_for(serveur_attente["blocage_ref"]["atteint"].wait(), timeout=5)
+        hass.config_entries.async_update_entry(entry, data={"stations": [STATION]})
+        serveur_attente["blocage_ref"]["evenement"].set()
+        await tache
+    assert donnees["en_attente"] == []
+    assert "PANNEREF" not in donnees["coordinateurs"]
+
+
+async def test_reessai_station_retiree_pendant_premiere_mesure(
+    hass: HomeAssistant, serveur_attente: dict
+) -> None:
+    """Station retirée pendant sa première mesure : aucun capteur créé pour elle."""
+    hass.config.language = "fr"
+    entry = await _installer_avec_attente(hass, serveur_attente["serveur"])
+    donnees = hass.data[DOMAIN][entry.entry_id]
+    serveur_attente["panne"]["actif"] = False
+    serveur_attente["blocage_obs"]["actif"] = True
+    with patch.object(hass.config_entries, "async_reload", AsyncMock(return_value=True)):
+        tache = asyncio.create_task(donnees["retenter"]())
+        await asyncio.wait_for(serveur_attente["blocage_obs"]["atteint"].wait(), timeout=5)
+        hass.config_entries.async_update_entry(entry, data={"stations": [STATION]})
+        serveur_attente["blocage_obs"]["evenement"].set()
+        await tache
+    await hass.async_block_till_done()
+    assert "PANNEREF" not in donnees["coordinateurs"]
+    assert _etat(hass, "moulin_de_test_panneref_hauteur") is None
+
+
+async def test_reessai_rendu_obsolete_pendant_premiere_mesure(
+    hass: HomeAssistant, serveur_attente: dict
+) -> None:
+    """Rechargement réel pendant la première mesure : la tentative obsolète sort sans rien créer."""
+    hass.config.language = "fr"
+    entry = await _installer_avec_attente(hass, serveur_attente["serveur"])
+    donnees = hass.data[DOMAIN][entry.entry_id]
+    serveur_attente["panne"]["actif"] = False
+    serveur_attente["blocage_obs"]["actif"] = True
+    tache = asyncio.create_task(donnees["retenter"]())
+    await asyncio.wait_for(serveur_attente["blocage_obs"]["atteint"].wait(), timeout=5)
+    hass.config_entries.async_update_entry(entry, data={"stations": [STATION]})
+    await hass.async_block_till_done()  # rechargement complet : nouvelle instance
+    assert hass.data[DOMAIN][entry.entry_id] is not donnees
+    serveur_attente["blocage_obs"]["evenement"].set()
+    await tache
+    await hass.async_block_till_done()
+    assert "PANNEREF" not in donnees["coordinateurs"]
+    assert _etat(hass, "moulin_de_test_panneref_hauteur") is None
+    assert float(_etat(hass, "moulin_de_test_hauteur").state) == 1.234
+
+
+async def test_reessai_en_echec_rendu_obsolete(hass: HomeAssistant, serveur_attente: dict) -> None:
+    """Réessai encore en échec mais rendu obsolète entre-temps : pas de replanification."""
+    hass.config.language = "fr"
+    entry = await _installer_avec_attente(hass, serveur_attente["serveur"])
+    donnees = hass.data[DOMAIN][entry.entry_id]
+    serveur_attente["blocage_ref"]["actif"] = True  # la panne reste active
+    tache = asyncio.create_task(donnees["retenter"]())
+    await asyncio.wait_for(serveur_attente["blocage_ref"]["atteint"].wait(), timeout=5)
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+    serveur_attente["blocage_ref"]["evenement"].set()
+    await tache
+    # L'attente n'est pas réécrite par une tentative obsolète.
+    assert donnees["en_attente"] == ["PANNEREF"]
+
+
+async def test_reessai_sans_plateforme_capteur(hass: HomeAssistant, serveur_attente: dict) -> None:
+    """Plateforme capteur absente : la station est reprise sans tentative d'ajout d'entités."""
+    hass.config.language = "fr"
+    entry = await _installer_avec_attente(hass, serveur_attente["serveur"])
+    donnees = hass.data[DOMAIN][entry.entry_id]
+    donnees["ajouter_entites"] = None
+    serveur_attente["panne"]["actif"] = False
+    await donnees["retenter"]()
+    await hass.async_block_till_done()
+    assert donnees["en_attente"] == []
+    assert "PANNEREF" in donnees["coordinateurs"]
+    assert _etat(hass, "moulin_de_test_panneref_hauteur") is None
+
+
+async def test_station_sans_coordonnees(hass: HomeAssistant, client: TestClient) -> None:
+    """Station sans coordonnées : pas d'attributs latitude/longitude (aucun marqueur faux)."""
+    hass.config.language = "fr"
+    await _demarrer(hass, client, ["SANSGPS"])
+    hauteur = _etat(hass, "moulin_de_test_sansgps_hauteur")
+    assert hauteur is not None
+    assert float(hauteur.state) == 1.234
+    assert "latitude" not in hauteur.attributes
+    assert "longitude" not in hauteur.attributes
+    assert hauteur.attributes["commune"]
